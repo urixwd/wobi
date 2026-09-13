@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '$lib/fonts-noto.css';
 
 :root {
 	color-scheme: dark;

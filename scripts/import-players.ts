@@ -17,6 +17,7 @@ import { eq, sql } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client';
 import { playerRoundStats, playerSnapshots, players, teams } from '../src/lib/server/db/schema';
 import { difficultyForTeamName } from '../src/lib/difficulty';
+import { ensureLocalLogo } from './lib/assetLocalize';
 
 type RawPlayer = {
 	id: number;
@@ -103,13 +104,14 @@ async function main() {
 	try {
 		for (const t of raw.data) {
 			const difficulty = difficultyForTeamName(t.name);
+			const logoPath = await ensureLocalLogo(t.teamLogoPath ?? null);
 			await db
 				.insert(teams)
 				.values({
 					id: t.id,
 					name: t.name,
-					logoPath: t.teamLogoPath ?? null,
-					shirtPath: t.teamShirtPath ?? null,
+					logoPath,
+					shirtPath: null, // shirts unused in UI
 					pageLink: t.teamPageLink ?? null,
 					difficulty
 				})
@@ -117,8 +119,8 @@ async function main() {
 					target: teams.id,
 					set: {
 						name: t.name,
-						logoPath: t.teamLogoPath ?? null,
-						shirtPath: t.teamShirtPath ?? null,
+						logoPath,
+						shirtPath: null,
 						pageLink: t.teamPageLink ?? null,
 						difficulty
 					}
@@ -135,9 +137,9 @@ async function main() {
 					price: toMillions(p.price),
 					shirtNumber: p.shirtNumber ?? null,
 					position: p.position,
-					imagePath: p.imagePath ?? null,
-					teamShirtPath: p.teamShirtPath ?? null,
-					teamLogoPath: p.teamLogoPath ?? null,
+					imagePath: null, // player headshots unused in UI
+					teamShirtPath: null,
+					teamLogoPath: logoPath,
 					injuredStatus: asBool(p.injuredStatus),
 					expelledStatus: asBool(p.expelledStatus),
 					missingStatus: asMissing(p.missingStatus),

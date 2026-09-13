@@ -49,3 +49,10 @@ Gitignore: `players.json`, `players-gw*.json`, `incoming/`, `exports/`.
 1. Today: GW4 seeded into `player_snapshots`.
 2. When Uri delivers GW5 dump → import with `--gw=5` (updates live `players` + snapshot 5).
 3. Repeat through GW26.
+
+## Static assets (no CDN at runtime)
+- Team logos only: `static/assets/sport5/Files/...` (paths in DB like `/assets/sport5/...`)
+- Fonts: `static/fonts/noto-sans-hebrew/` + `src/lib/fonts-noto.css`
+- Player headshots / shirts are **not** used in the UI and are not stored locally
+- Refresh logos: `bun run db:localize-assets` (also runs as part of player import for team logos)
+
