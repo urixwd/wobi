@@ -1,0 +1,27 @@
+{
+  "currentRound": 4,
+  "fixtures": [
+    {
+      "gameweek": 4,
+      "homeTeamId": 133,
+      "awayTeamId": 128,
+      "kickoff": null,
+      "externalId": "sample-1"
+    },
+    {
+      "gameweek": 4,
+      "homeTeamId": 138,
+      "awayTeamId": 130,
+      "kickoff": null,
+      "externalId": "sample-2"
+    },
+    {
+      "gameweek": 5,
+      "homeTeamId": 132,
+      "awayTeamId": 140,
+      "kickoff": null,
+      "externalId": "sample-3"
+    }
+  ],
+  "_comment": "Sample only. Replace via bun run db:import-fixtures. TODO: scrape from dreamteam.sport5.co.il"
+}
