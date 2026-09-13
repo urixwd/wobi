@@ -57,3 +57,7 @@ bun run dev
 - אל תעלו `.env` ל־git (כבר ב־`.gitignore`)
 - אל תמחקו/תדרסו את `players.json` הקיים
 - התעלמו מ־`1st.md` אם קיים
+
+## Round history / momentum
+Each `bun run db:import-players` upserts into `player_round_stats` from `lastRoundPlayerStats`.
+Momentum UI is planned from **gameweek 7** (needs ~3 stored rounds per player).

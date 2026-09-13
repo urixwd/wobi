@@ -2,10 +2,15 @@ import { fail } from '@sveltejs/kit';
 import { asc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { players, teams, watchlistPermanent, watchlistRound } from '$lib/server/db/schema';
+import {
+	attachUpcoming,
+	getUpcomingFixturesByTeamIds,
+	resolveCurrentGwNumber
+} from '$lib/server/upcomingFixtures';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
-	const permanent = await db
+	const permanentRaw = await db
 		.select({
 			row: watchlistPermanent,
 			player: players,
@@ -18,7 +23,7 @@ export const load: PageServerLoad = async () => {
 		.leftJoin(teams, eq(players.teamId, teams.id))
 		.orderBy(asc(players.name));
 
-	const round = await db
+	const roundRaw = await db
 		.select({
 			row: watchlistRound,
 			player: players,
@@ -31,7 +36,7 @@ export const load: PageServerLoad = async () => {
 		.leftJoin(teams, eq(players.teamId, teams.id))
 		.orderBy(asc(players.name));
 
-	const allPlayers = await db
+	const allPlayersRaw = await db
 		.select({
 			player: players,
 			teamName: teams.name,
@@ -43,7 +48,19 @@ export const load: PageServerLoad = async () => {
 		.orderBy(asc(players.name))
 		.limit(500);
 
-	return { permanent, round, allPlayers };
+	const fromGw = await resolveCurrentGwNumber(4);
+	const teamIds = [
+		...permanentRaw.map((r) => r.player.teamId),
+		...roundRaw.map((r) => r.player.teamId),
+		...allPlayersRaw.map((r) => r.player.teamId)
+	];
+	const upcomingByTeam = await getUpcomingFixturesByTeamIds(teamIds, fromGw, 5);
+
+	return {
+		permanent: attachUpcoming(permanentRaw, upcomingByTeam),
+		round: attachUpcoming(roundRaw, upcomingByTeam),
+		allPlayers: attachUpcoming(allPlayersRaw, upcomingByTeam)
+	};
 };
 
 export const actions: Actions = {

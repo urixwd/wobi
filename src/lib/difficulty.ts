@@ -45,3 +45,38 @@ export const DIFFICULTY_LABEL: Record<FixtureDifficulty, string> = {
 	yellow: 'בינוני',
 	green: 'קל'
 };
+
+
+/** Higher = harder. Used for 5-fixture run average. */
+export const DIFFICULTY_SCORE: Record<FixtureDifficulty, number> = {
+	green: 1,
+	yellow: 2,
+	red: 3
+};
+
+/** Mean difficulty score of the next `slots` fixtures (1=easy … 3=hard). */
+export function fixtureRunAverage(
+	fixtures: { difficulty: FixtureDifficulty }[] | undefined | null,
+	slots = 5
+): number | null {
+	const slice = (fixtures ?? []).slice(0, slots);
+	if (!slice.length) return null;
+	const sum = slice.reduce((s, f) => s + (DIFFICULTY_SCORE[f.difficulty] ?? 2), 0);
+	return sum / slice.length;
+}
+
+/**
+ * Bucket the 5-game run into traffic-light:
+ * ≤1.5 קל · ≤2.25 בינוני · else קשה
+ */
+export function fixtureRunBucket(avg: number | null): FixtureDifficulty | null {
+	if (avg == null || !Number.isFinite(avg)) return null;
+	if (avg <= 1.5) return 'green';
+	if (avg <= 2.25) return 'yellow';
+	return 'red';
+}
+
+export function formatFixtureRun(avg: number | null): string {
+	if (avg == null || !Number.isFinite(avg)) return '—';
+	return avg.toFixed(1);
+}

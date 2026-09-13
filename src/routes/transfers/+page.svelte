@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { positionLabel } from '$lib/positions';
+	import { formatPrice } from '$lib/format';
+	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
 
 	let { data } = $props();
 </script>
@@ -33,7 +35,10 @@
 							<div class="text-xs text-red-300">יוצא</div>
 							<div class="font-semibold">{s.outPlayer.name}</div>
 							<div class="text-xs text-slate-400">
-								{positionLabel(s.outPlayer.position)} · {s.outPlayer.teamName ?? ''} · {s.outPlayer.price.toFixed(1)}m
+								{positionLabel(s.outPlayer.position)} · {s.outPlayer.teamName ?? ''} · {formatPrice(s.outPlayer.price)}
+							</div>
+							<div class="mt-2">
+								<FixtureStrip fixtures={s.outUpcoming} />
 							</div>
 						</div>
 						<div class="text-center text-emerald-400">→</div>
@@ -41,7 +46,10 @@
 							<div class="text-xs text-emerald-300">נכנס</div>
 							<div class="font-semibold">{s.inPlayer.name}</div>
 							<div class="text-xs text-slate-400">
-								{positionLabel(s.inPlayer.position)} · {s.inPlayer.teamName ?? ''} · {s.inPlayer.price.toFixed(1)}m
+								{positionLabel(s.inPlayer.position)} · {s.inPlayer.teamName ?? ''} · {formatPrice(s.inPlayer.price)}
+							</div>
+							<div class="mt-2">
+								<FixtureStrip fixtures={s.inUpcoming} />
 							</div>
 						</div>
 					</div>

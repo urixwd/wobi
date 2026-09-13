@@ -4,9 +4,9 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client';
-import { players, teams } from '../src/lib/server/db/schema';
+import { gameweeks, playerRoundStats, players, teams } from '../src/lib/server/db/schema';
 import { difficultyForTeamName } from '../src/lib/difficulty';
 
 
@@ -41,6 +41,18 @@ type PlayersFile = {
 	error?: unknown;
 	data: RawTeam[];
 };
+
+/** Sport5 prices are raw (e.g. 9000000); we store millions 1–15. */
+function toMillions(price: unknown): number {
+	const n = Number(price) || 0;
+	return n >= 1000 ? Math.round(n / 1_000_000) : n;
+}
+
+function asMissing(v: unknown): number {
+	const n = Number(v);
+	if (n === 1 || n === 2) return n;
+	return 0;
+}
 
 function asBool(v: unknown): boolean {
 	if (typeof v === 'boolean') return v;
@@ -84,13 +96,15 @@ async function main() {
 			teamCount++;
 
 			for (const p of t.players ?? []) {
+				// 2 = leftover / not in live game pool
+				if (asMissing(p.missingStatus) === 2) continue;
 				await db
 					.insert(players)
 					.values({
 						id: p.id,
 						teamId: p.teamId ?? t.id,
 						name: p.name,
-						price: Number(p.price) || 0,
+						price: toMillions(p.price),
 						shirtNumber: p.shirtNumber ?? null,
 						position: p.position,
 						imagePath: p.imagePath ?? null,
@@ -98,7 +112,7 @@ async function main() {
 						teamLogoPath: p.teamLogoPath ?? null,
 						injuredStatus: asBool(p.injuredStatus),
 						expelledStatus: asBool(p.expelledStatus),
-						missingStatus: asBool(p.missingStatus),
+						missingStatus: asMissing(p.missingStatus),
 						lastRoundPlayerStats: p.lastRoundPlayerStats ?? null,
 						lastSeasonPlayerStats: p.lastSeasonPlayerStats ?? null,
 						updatedAt: new Date()
@@ -108,7 +122,7 @@ async function main() {
 						set: {
 							teamId: p.teamId ?? t.id,
 							name: p.name,
-							price: Number(p.price) || 0,
+							price: toMillions(p.price),
 							shirtNumber: p.shirtNumber ?? null,
 							position: p.position,
 							imagePath: p.imagePath ?? null,
@@ -116,14 +130,72 @@ async function main() {
 							teamLogoPath: p.teamLogoPath ?? null,
 							injuredStatus: asBool(p.injuredStatus),
 							expelledStatus: asBool(p.expelledStatus),
-							missingStatus: asBool(p.missingStatus),
+							missingStatus: asMissing(p.missingStatus),
 							lastRoundPlayerStats: p.lastRoundPlayerStats ?? null,
 							lastSeasonPlayerStats: p.lastSeasonPlayerStats ?? null,
 							updatedAt: new Date()
 						}
 					});
+
+				// Accumulate round history for momentum (from GW 7 UI)
+				const lr = p.lastRoundPlayerStats as
+					| {
+							roundId?: number;
+							points?: number;
+							seasonPoints?: number;
+							statsData?: unknown;
+					  }
+					| null
+					| undefined;
+				if (lr && Number.isFinite(Number(lr.roundId))) {
+					const sport5RoundId = Number(lr.roundId);
+					const points = Number(lr.points ?? 0) || 0;
+					const seasonPts = Number.isFinite(Number(lr.seasonPoints))
+						? Number(lr.seasonPoints)
+						: null;
+					let statsData: unknown = lr.statsData ?? null;
+					if (typeof statsData === 'string') {
+						try {
+							statsData = JSON.parse(statsData);
+						} catch {
+							/* keep string */
+						}
+					}
+					await db
+						.insert(playerRoundStats)
+						.values({
+							playerId: p.id,
+							sport5RoundId,
+							gameweekNumber: null, // filled below from current GW when possible
+							points,
+							seasonPoints: seasonPts,
+							statsData,
+							capturedAt: new Date()
+						})
+						.onConflictDoUpdate({
+							target: [playerRoundStats.playerId, playerRoundStats.sport5RoundId],
+							set: {
+								points,
+								seasonPoints: seasonPts,
+								statsData,
+								capturedAt: new Date()
+							}
+						});
+				}
+
 				playerCount++;
 			}
+		}
+
+		// Tag latest snapshots missing gameweek with current GW number (best-effort)
+		const currentGw = (
+			await db.select().from(gameweeks).where(eq(gameweeks.isCurrent, true)).limit(1)
+		)[0];
+		if (currentGw) {
+			await db
+				.update(playerRoundStats)
+				.set({ gameweekNumber: currentGw.number })
+				.where(sql`${playerRoundStats.gameweekNumber} is null`);
 		}
 
 		const [{ count: dbPlayers }] = await db
@@ -131,8 +203,11 @@ async function main() {
 			.from(players);
 		const [{ count: dbTeams }] = await db.select({ count: sql<number>`count(*)::int` }).from(teams);
 
+		const [{ count: roundRows }] = await db
+			.select({ count: sql<number>`count(*)::int` })
+			.from(playerRoundStats);
 		console.log(`Upserted ${teamCount} teams, ${playerCount} players from players.json`);
-		console.log(`DB now has ${dbTeams} teams, ${dbPlayers} players`);
+		console.log(`DB now has ${dbTeams} teams, ${dbPlayers} players, ${roundRows} round-stat rows`);
 	} finally {
 		await client.end({ timeout: 5 });
 	}

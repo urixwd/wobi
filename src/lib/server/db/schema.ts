@@ -44,7 +44,8 @@ export const players = pgTable('players', {
 	teamLogoPath: text('team_logo_path'),
 	injuredStatus: boolean('injured_status').notNull().default(false),
 	expelledStatus: boolean('expelled_status').notNull().default(false),
-	missingStatus: boolean('missing_status').notNull().default(false),
+		/** Sport5: 0=available, 1=נעדר (selectable), 2=inactive/previous season */
+	missingStatus: integer('missing_status').notNull().default(0),
 	lastRoundPlayerStats: jsonb('last_round_player_stats'),
 	lastSeasonPlayerStats: jsonb('last_season_player_stats'),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
@@ -116,8 +117,44 @@ export const watchlistRound = pgTable(
 	(t) => [uniqueIndex('watchlist_round_player_uidx').on(t.playerId)]
 );
 
+
+/** Per-round points snapshot for momentum (filled on each players.json import). */
+export const playerRoundStats = pgTable(
+	'player_round_stats',
+	{
+		id: serial('id').primaryKey(),
+		playerId: integer('player_id')
+			.notNull()
+			.references(() => players.id),
+		/** Sport5 round id from lastRoundPlayerStats.roundId */
+		sport5RoundId: integer('sport5_round_id').notNull(),
+		/** Our league gameweek number when known (nullable until mapped) */
+		gameweekNumber: integer('gameweek_number'),
+		points: real('points').notNull().default(0),
+		seasonPoints: real('season_points'),
+		statsData: jsonb('stats_data'),
+		capturedAt: timestamp('captured_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('player_round_stats_player_s5_uidx').on(t.playerId, t.sport5RoundId)]
+);
+
 export type Team = typeof teams.$inferSelect;
 export type Player = typeof players.$inferSelect;
 export type Gameweek = typeof gameweeks.$inferSelect;
 export type Fixture = typeof fixtures.$inferSelect;
+
+/** Lineup sketches / drafts, keyed by gameweek. WIP (incomplete) allowed. */
+export const sketches = pgTable('sketches', {
+	id: serial('id').primaryKey(),
+	name: text('name').notNull().default('סקיצה'),
+	gameweekNumber: integer('gameweek_number').notNull(),
+	xiPlayerIds: jsonb('xi_player_ids').$type<number[]>().notNull().default([]),
+	benchPlayerIds: jsonb('bench_player_ids').$type<number[]>().notNull().default([]),
+	notes: text('notes'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+});
+
 export type MySquad = typeof mySquad.$inferSelect;
+export type Sketch = typeof sketches.$inferSelect;
+export type PlayerRoundStats = typeof playerRoundStats.$inferSelect;

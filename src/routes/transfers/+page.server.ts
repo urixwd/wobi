@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import {
 	fixtures,
@@ -9,6 +9,10 @@ import {
 	type FixtureDifficulty
 } from '$lib/server/db/schema';
 import { suggestTransfers } from '$lib/server/suggestions';
+import {
+	getUpcomingFixturesByTeamIds,
+	resolveCurrentGwNumber
+} from '$lib/server/upcomingFixtures';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
@@ -46,9 +50,22 @@ export const load: PageServerLoad = async () => {
 				})
 			: [];
 
+	const fromGw = await resolveCurrentGwNumber(4);
+	const suggestionTeamIds = suggestions.flatMap((s) => [
+		s.outPlayer.teamId,
+		s.inPlayer.teamId
+	]);
+	const upcomingByTeam = await getUpcomingFixturesByTeamIds(suggestionTeamIds, fromGw, 5);
+
+	const suggestionsWithFixtures = suggestions.map((s) => ({
+		...s,
+		outUpcoming: upcomingByTeam.get(s.outPlayer.teamId) ?? [],
+		inUpcoming: upcomingByTeam.get(s.inPlayer.teamId) ?? []
+	}));
+
 	return {
 		squad,
-		suggestions,
+		suggestions: suggestionsWithFixtures,
 		freeTransfers: squad?.freeTransfers ?? 3,
 		playerCount: allPlayers.length
 	};

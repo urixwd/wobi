@@ -1,0 +1,1409 @@
+{
+  "source": "https://www.one.co.il/Soccer/League/1",
+  "rounds": [
+    {
+      "number": 1,
+      "fixtures": [
+        {
+          "home": "מכבי פ\"ת",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-08-22T20:00:00",
+          "homeScore": 2,
+          "awayScore": 1
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-08-22T20:00:00",
+          "homeScore": 1,
+          "awayScore": 0
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-08-22T20:30:00",
+          "homeScore": 2,
+          "awayScore": 1
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-08-23T20:15:00",
+          "homeScore": 2,
+          "awayScore": 5
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "בני סכנין",
+          "kickoff": "2026-08-24T20:00:00",
+          "homeScore": 0,
+          "awayScore": 0
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-09-02T20:00:00",
+          "homeScore": 2,
+          "awayScore": 2
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-09-03T20:30:00",
+          "homeScore": 3,
+          "awayScore": 0
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "fixtures": [
+        {
+          "home": "בני סכנין",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-08-29T20:00:00",
+          "homeScore": 1,
+          "awayScore": 2
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-08-29T20:00:00",
+          "homeScore": 1,
+          "awayScore": 0
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-08-29T20:00:00",
+          "homeScore": 1,
+          "awayScore": 2
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-08-29T20:00:00",
+          "homeScore": 2,
+          "awayScore": 0
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-08-29T20:30:00",
+          "homeScore": 1,
+          "awayScore": 4
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-08-30T20:15:00",
+          "homeScore": 0,
+          "awayScore": 0
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-08-31T20:30:00",
+          "homeScore": 3,
+          "awayScore": 1
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "fixtures": [
+        {
+          "home": "הפועל ירושלים",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-09-05T19:45:00",
+          "homeScore": 4,
+          "awayScore": 2
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-09-05T19:45:00",
+          "homeScore": 1,
+          "awayScore": 2
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-09-05T20:30:00",
+          "homeScore": 2,
+          "awayScore": 1
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-09-07T19:45:00",
+          "homeScore": 1,
+          "awayScore": 1
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-09-07T20:00:00",
+          "homeScore": 4,
+          "awayScore": 0
+        },
+        {
+          "home": "בני סכנין",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-09-07T20:15:00",
+          "homeScore": 0,
+          "awayScore": 1
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-09-07T20:30:00",
+          "homeScore": 1,
+          "awayScore": 4
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "fixtures": [
+        {
+          "home": "הפועל פ\"ת",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-09-13T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "בני סכנין",
+          "kickoff": "2026-09-14T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-09-14T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-09-14T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-09-14T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-09-15T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-09-15T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "fixtures": [
+        {
+          "home": "הפועל ת\"א",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-09-18T15:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-09-19T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-09-19T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-09-19T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-09-19T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-09-19T20:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-09-19T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "fixtures": [
+        {
+          "home": "הפועל חיפה",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-10-10T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-10-10T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-10-10T19:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-10-10T19:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "בני סכנין",
+          "kickoff": "2026-10-10T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-10-11T20:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-10-12T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "fixtures": [
+        {
+          "home": "הפועל ת\"א",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-10-17T18:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-10-17T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-10-17T19:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-10-17T19:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-10-17T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-10-18T20:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-10-19T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "fixtures": [
+        {
+          "home": "הפועל ירושלים",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-10-24T18:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "בני סכנין",
+          "kickoff": "2026-10-24T18:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-10-24T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-10-24T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-10-24T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-10-25T20:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-10-26T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "fixtures": [
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-10-31T15:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-10-31T17:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-10-31T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-10-31T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-11-01T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-11-02T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-11-02T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "fixtures": [
+        {
+          "home": "מכבי ת\"א",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-11-06T14:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-11-07T15:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-11-07T17:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "בני סכנין",
+          "kickoff": "2026-11-07T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-11-07T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-11-07T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-11-08T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "fixtures": [
+        {
+          "home": "מכבי פ\"ת",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-11-27T14:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-11-28T15:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-11-28T17:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-11-28T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-11-28T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-11-28T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-11-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 12,
+      "fixtures": [
+        {
+          "home": "עירוני טבריה",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-12-01T18:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-12-01T19:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-12-01T19:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-12-01T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-12-02T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "בני סכנין",
+          "kickoff": "2026-12-03T19:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-12-03T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 13,
+      "fixtures": [
+        {
+          "home": "מכבי ת\"א",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-12-05T15:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-12-05T17:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-12-05T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-12-05T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-12-06T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-12-07T19:45:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-12-07T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 14,
+      "fixtures": [
+        {
+          "home": "הפועל פ\"ת",
+          "away": "עירוני טבריה",
+          "kickoff": "2026-12-11T14:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-12-12T15:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-12-12T17:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-12-12T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-12-12T19:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-12-14T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-12-14T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 15,
+      "fixtures": [
+        {
+          "home": "הפועל ירושלים",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2026-12-18T14:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "הפועל חיפה",
+          "kickoff": "2026-12-19T15:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "בני סכנין",
+          "kickoff": "2026-12-19T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2026-12-19T18:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2026-12-19T19:30:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2026-12-20T20:15:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "מכבי ת\"א",
+          "kickoff": "2026-12-21T20:30:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 16,
+      "fixtures": [
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "בני סכנין",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "מכבי נתניה",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "מכבי חיפה",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "הפועל ת\"א",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "הפועל ירושלים",
+          "kickoff": "2026-12-29T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 17,
+      "fixtures": [
+        {
+          "home": "בני סכנין",
+          "away": "הפועל חיפה",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "עירוני טבריה",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "מכבי ת\"א",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2027-01-02T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 18,
+      "fixtures": [
+        {
+          "home": "הפועל חיפה",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "הפועל ת\"א",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "בני סכנין",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "מכבי נתניה",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "מכבי חיפה",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2027-01-09T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 19,
+      "fixtures": [
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "מכבי ת\"א",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "עירוני טבריה",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "הפועל ירושלים",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "הפועל חיפה",
+          "kickoff": "2027-01-16T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 20,
+      "fixtures": [
+        {
+          "home": "הפועל ירושלים",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "בני סכנין",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "הפועל חיפה",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "הפועל ת\"א",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "מכבי נתניה",
+          "kickoff": "2027-01-23T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 21,
+      "fixtures": [
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ב\"ש",
+          "away": "מכבי חיפה",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "מכבי ת\"א",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "הפועל ירושלים",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "עירוני טבריה",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2027-01-30T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 22,
+      "fixtures": [
+        {
+          "home": "הפועל ב\"ש",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "מכבי נתניה",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "הפועל חיפה",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "הפועל ת\"א",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "בני סכנין",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2027-02-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 23,
+      "fixtures": [
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "עירוני טבריה",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "הפועל ירושלים",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "מכבי חיפה",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "מכבי ת\"א",
+          "kickoff": "2027-02-13T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 24,
+      "fixtures": [
+        {
+          "home": "הפועל ב\"ש",
+          "away": "מכבי נתניה",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "מכבי ת\"א",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "בני סכנין",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "הפועל חיפה",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2027-02-20T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 25,
+      "fixtures": [
+        {
+          "home": "בית\"ר ירושלים",
+          "away": "מכבי חיפה",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "בני סכנין",
+          "away": "הפועל ב\"ש",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל חיפה",
+          "away": "הפועל ירושלים",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל פ\"ת",
+          "away": "מכבי פ\"ת",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ר\"ג",
+          "away": "עירוני טבריה",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי נתניה",
+          "away": "הפועל ת\"א",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי ת\"א",
+          "away": "עירוני ק\"ש",
+          "kickoff": "2027-02-27T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    },
+    {
+      "number": 26,
+      "fixtures": [
+        {
+          "home": "הפועל ב\"ש",
+          "away": "בית\"ר ירושלים",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ירושלים",
+          "away": "הפועל ר\"ג",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "הפועל ת\"א",
+          "away": "בני סכנין",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי חיפה",
+          "away": "הפועל חיפה",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "מכבי פ\"ת",
+          "away": "מכבי נתניה",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני טבריה",
+          "away": "מכבי ת\"א",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        },
+        {
+          "home": "עירוני ק\"ש",
+          "away": "הפועל פ\"ת",
+          "kickoff": "2027-03-06T20:00:00",
+          "homeScore": null,
+          "awayScore": null
+        }
+      ]
+    }
+  ]
+}

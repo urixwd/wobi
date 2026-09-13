@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PlayerRow from '$lib/components/PlayerRow.svelte';
+	import { seasonPoints } from '$lib/stats';
 	import { enhance } from '$app/forms';
 
 	let { data } = $props();
@@ -32,11 +33,13 @@
 									teamName={item.teamName}
 									position={item.player.position}
 									price={item.player.price}
+									playerStats={item.player}
 									logoPath={item.teamLogo ?? item.player.teamLogoPath}
 									difficulty={item.difficulty}
 									injured={item.player.injuredStatus}
 									expelled={item.player.expelledStatus}
-									missing={item.player.missingStatus}
+									missing={item.player.missingStatus === 1}
+									upcomingFixtures={item.upcomingFixtures}
 								/>
 							</div>
 							<form method="POST" action="?/removePermanent" use:enhance>
@@ -63,11 +66,13 @@
 									teamName={item.teamName}
 									position={item.player.position}
 									price={item.player.price}
+									playerStats={item.player}
 									logoPath={item.teamLogo ?? item.player.teamLogoPath}
 									difficulty={item.difficulty}
 									injured={item.player.injuredStatus}
 									expelled={item.player.expelledStatus}
-									missing={item.player.missingStatus}
+									missing={item.player.missingStatus === 1}
+									upcomingFixtures={item.upcomingFixtures}
 								/>
 							</div>
 							<form method="POST" action="?/removeRound" use:enhance>
@@ -113,11 +118,13 @@
 								teamName={r.teamName}
 								position={r.player.position}
 								price={r.player.price}
+								playerStats={r.player}
 								logoPath={r.teamLogo ?? r.player.teamLogoPath}
 								difficulty={r.difficulty}
 								injured={r.player.injuredStatus}
 								expelled={r.player.expelledStatus}
-								missing={r.player.missingStatus}
+								missing={r.player.missingStatus === 1}
+								upcomingFixtures={r.upcomingFixtures}
 							/>
 						</div>
 						<form
