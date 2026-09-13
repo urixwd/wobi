@@ -10,6 +10,12 @@
 </script>
 
 <svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&display=swap"
+		rel="stylesheet"
+	/>
 	<link rel="icon" href={favicon} />
 	<title>WOBI — עזר לחילופים Dream Team</title>
 </svelte:head>
