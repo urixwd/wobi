@@ -16,6 +16,7 @@
 	import type { FixtureDifficulty } from '$lib/server/db/schema';
 	import { enhance } from '$app/forms';
 	import { BUDGET_TOTAL, canAddToBench, canAddToXi, canFitInSquad } from '$lib/squadRules';
+	import { writeSquadDraft } from '$lib/squadDraft';
 	import { buildPointsDeciles, formatVlfm, vlfm } from '$lib/playerMetrics';
 
 	let { data, form } = $props();
@@ -24,6 +25,59 @@
 	let xi = $state<number[]>([...(data.staged?.xi ?? data.squad.xiPlayerIds)]);
 	let bench = $state<number[]>([...(data.staged?.bench ?? data.squad.benchPlayerIds)]);
 	let freeTransfers = $state(data.squad.freeTransfers);
+	let viewGw = $state(data.currentGw);
+
+	$effect(() => {
+		writeSquadDraft(xi, bench);
+	});
+
+	function formatKickoff(raw: string | Date | null | undefined): {
+		day: string;
+		date: string;
+		time: string;
+		dayKey: string;
+	} {
+		if (!raw) return { day: 'ללא תאריך', date: '—', time: '—', dayKey: 'none' };
+		const d = new Date(raw);
+		if (Number.isNaN(d.getTime())) return { day: 'ללא תאריך', date: '—', time: '—', dayKey: 'none' };
+		const day = d.toLocaleDateString('he-IL', { weekday: 'long' });
+		const date = d.toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: 'numeric' });
+		const time = d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+		const dayKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+		return { day, date, time, dayKey };
+	}
+
+	const fixturesForView = $derived(
+		(data.gwFixtures ?? [])
+			.filter((f) => f.gwNumber === viewGw)
+			.slice()
+			.sort((a, b) => {
+				const ta = a.kickoff ? new Date(a.kickoff).getTime() : Number.POSITIVE_INFINITY;
+				const tb = b.kickoff ? new Date(b.kickoff).getTime() : Number.POSITIVE_INFINITY;
+				return ta - tb || a.id - b.id;
+			})
+	);
+
+	const fixturesByDay = $derived.by(() => {
+		const groups: {
+			dayKey: string;
+			day: string;
+			date: string;
+			rows: typeof fixturesForView;
+		}[] = [];
+		const index = new Map<string, number>();
+		for (const row of fixturesForView) {
+			const when = formatKickoff(row.kickoff);
+			let i = index.get(when.dayKey);
+			if (i == null) {
+				i = groups.length;
+				index.set(when.dayKey, i);
+				groups.push({ dayKey: when.dayKey, day: when.day, date: when.date, rows: [] });
+			}
+			groups[i].rows.push(row);
+		}
+		return groups;
+	});
 	/** Last saved in DB — transfer diff baseline */
 	let savedXi = $state<number[]>([...data.squad.xiPlayerIds]);
 	let savedBench = $state<number[]>([...data.squad.benchPlayerIds]);
@@ -86,7 +140,13 @@
 	}
 
 	const poolPlayers = $derived(
-		data.allPlayers.filter((r) => r.player.missingStatus !== 2)
+		data.allPlayers.filter((r) => {
+			if (r.player.missingStatus === 2) return false;
+			const pts = seasonPoints(r.player) ?? 0;
+			// Hide 0-point players from the table/deciles, unless already in the squad.
+			if (pts <= 0 && !xi.includes(r.player.id) && !bench.includes(r.player.id)) return false;
+			return true;
+		})
 	);
 
 	const DIFF_ORDER: FixtureDifficulty[] = ['green', 'yellow', 'red'];
@@ -273,13 +333,13 @@
 	let dropTarget = $state<'xi' | 'bench' | null>(null);
 	let openStatsId = $state<number | null>(null);
 	let statsPanelPos = $state<{ top: number; left: number } | null>(null);
-	let helpTip = $state<null | { key: 'vlfm' | 'decile'; top: number; left: number; pinned?: boolean }>(
-		null
-	);
+	let helpTip = $state<
+		null | { key: 'vlfm' | 'decile' | 'run'; top: number; left: number; pinned?: boolean }
+	>(null);
 
-	function showHelp(key: 'vlfm' | 'decile', el: HTMLElement, pinned = false) {
+	function showHelp(key: 'vlfm' | 'decile' | 'run', el: HTMLElement, pinned = false) {
 		const rect = el.getBoundingClientRect();
-		const width = key === 'vlfm' ? 220 : 230;
+		const width = key === 'run' ? 280 : key === 'vlfm' ? 220 : 230;
 		helpTip = {
 			key,
 			top: rect.bottom + 6,
@@ -288,7 +348,7 @@
 		};
 	}
 
-	function toggleHelp(key: 'vlfm' | 'decile', el: HTMLElement) {
+	function toggleHelp(key: 'vlfm' | 'decile' | 'run', el: HTMLElement) {
 		if (helpTip?.key === key && helpTip.pinned) {
 			helpTip = null;
 			return;
@@ -501,10 +561,15 @@
 			{#if helpTip.key === 'vlfm'}
 				<strong class="text-violet-300">vlfm</strong>
 				= נקודות עונה ÷ מחיר (מיליונים). כמה נקודות מקבלים לכל מיליון.
-			{:else}
+			{:else if helpTip.key === 'decile'}
 				<strong class="text-emerald-300">עשירון</strong>
 				לפי נקודות עונה בלבד (לא vlfm). ממיינים את הפול מהנמוך לגבוה; 10 =
-				עליון, 1 = תחתון.
+				עליון, 1 = תחתון. שחקנים עם 0 נק׳ לא נכנסים לחישוב.
+			{:else}
+				<strong class="text-amber-200">לוח (5)</strong>
+				ממוצע קושי של 5 המשחקים הבאים של הקבוצה: ירוק=1, צהוב=2, אדום=3.
+				<br />קל ≤ 1.5 · בינוני ≤ 2.25 · קשה מעל 2.25.
+				<br />לחיצה על סמל בוחרת את הקבוצה בפילטר.
 			{/if}
 		</div>
 	{/if}
@@ -876,57 +941,6 @@
 		</div>
 
 		<div class="flex min-h-0 flex-col gap-3">
-			<div class="flex flex-wrap gap-2">
-				<button
-					type="button"
-					class="rounded-lg px-2.5 py-1 text-xs {posFilter === 0 ? 'bg-emerald-500/25 text-emerald-200' : 'bg-slate-800 text-slate-300'}"
-					onclick={() => (posFilter = 0)}>כל העמדות</button
-				>
-				{#each [1, 2, 3, 4] as pos}
-					<button
-						type="button"
-						class="rounded-lg px-2.5 py-1 text-xs {posFilter === pos ? 'bg-emerald-500/25 text-emerald-200' : 'bg-slate-800 text-slate-300'}"
-						onclick={() => (posFilter = pos)}>{positionLabel(pos)}</button
-					>
-				{/each}
-			</div>
-
-			<div class="rounded-xl border border-slate-800 bg-slate-950/50 p-2">
-				<div class="mb-2 flex items-center justify-between text-xs text-slate-400">
-					<span>קבוצות (בחירה מרובה)</span>
-					{#if teamFilters.length}
-						<button type="button" class="text-emerald-300" onclick={() => (teamFilters = [])}
-							>נקה</button
-						>
-					{/if}
-				</div>
-				<div class="flex flex-wrap gap-1.5">
-					{#each TEAM_DIFF_GROUPS as group}
-						{#each teamOptions.filter((tm) => tm.difficulty === group.key) as team}
-							<button
-								type="button"
-								class="flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-1 text-[11px] {teamFilters.includes(
-									team.id
-								)
-									? 'bg-sky-500/30 text-sky-100 ring-2 ' + DIFFICULTY_RING[group.key]
-									: 'bg-slate-800 text-slate-300 ring-1 ring-slate-700'}"
-								onclick={() => toggleTeam(team.id)}
-								title={team.name}
-							>
-								<span
-									class="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-slate-900"
-								>
-									{#if team.logo}
-										<img src={team.logo} alt="" class="h-4 w-4 object-contain" />
-									{/if}
-								</span>
-								<span class="max-w-[7rem] truncate">{team.name}</span>
-							</button>
-						{/each}
-					{/each}
-				</div>
-			</div>
-
 			<div class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/40 p-2 text-xs">
 				<div class="text-slate-400" title="המשחק הקרוב ביותר">
 					יריבה קרובה — לחיצה על סמל = בחירת קבוצה
@@ -971,8 +985,22 @@
 			</div>
 
 			<div class="space-y-2 rounded-xl border border-slate-800 bg-slate-950/40 p-2 text-xs">
-				<div class="text-slate-400" title="ממוצע קושי 5 המשחקים הקרובים">
-					לוח (5) — לחיצה על סמל = בחירת קבוצה
+				<div class="flex flex-wrap items-center gap-1.5 text-slate-400">
+					<span title="ממוצע קושי 5 המשחקים הקרובים">לוח (5) — לחיצה על סמל = בחירת קבוצה</span>
+					<button
+						type="button"
+						class="flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-200 hover:bg-slate-600"
+						aria-label="איך מחושב לוח"
+						onclick={(e) => {
+							e.stopPropagation();
+							toggleHelp('run', e.currentTarget);
+						}}
+						onmouseenter={(e) => showHelp('run', e.currentTarget, false)}
+						onmouseleave={() => {
+							if (helpTip?.key === 'run' && !helpTip.pinned) helpTip = null;
+						}}
+					>?</button
+					>
 				</div>
 				{#each DIFF_ORDER as d}
 					{@const teams = teamsForRun(d)}
@@ -1013,7 +1041,59 @@
 				{/each}
 			</div>
 
+			<div class="rounded-xl border border-slate-800 bg-slate-950/50 p-2">
+				<div class="mb-2 flex items-center justify-between text-xs text-slate-400">
+					<span>קבוצות (בחירה מרובה)</span>
+					{#if teamFilters.length}
+						<button type="button" class="text-emerald-300" onclick={() => (teamFilters = [])}
+							>נקה</button
+						>
+					{/if}
+				</div>
+				<div class="flex flex-wrap gap-1.5">
+					{#each TEAM_DIFF_GROUPS as group}
+						{#each teamOptions.filter((tm) => tm.difficulty === group.key) as team}
+							<button
+								type="button"
+								class="flex items-center gap-1.5 rounded-full py-1 pl-2.5 pr-1 text-[11px] {teamFilters.includes(
+									team.id
+								)
+									? 'bg-sky-500/30 text-sky-100 ring-2 ' + DIFFICULTY_RING[group.key]
+									: 'bg-slate-800 text-slate-300 ring-1 ring-slate-700'}"
+								onclick={() => toggleTeam(team.id)}
+								title={team.name}
+							>
+								<span
+									class="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-slate-900"
+								>
+									{#if team.logo}
+										<img src={team.logo} alt="" class="h-4 w-4 object-contain" />
+									{/if}
+								</span>
+								<span class="max-w-[7rem] truncate">{team.name}</span>
+							</button>
+						{/each}
+					{/each}
+				</div>
+			</div>
+
 			<PriceRangeSlider bind:minValue={priceMin} bind:maxValue={priceMax} min={3} max={15} />
+
+			<div class="flex flex-wrap gap-2">
+				<button
+					type="button"
+					class="rounded-lg px-2.5 py-1 text-xs {posFilter === 0 ? 'bg-emerald-500/25 text-emerald-200' : 'bg-slate-800 text-slate-300'}"
+					onclick={() => (posFilter = 0)}>כל העמדות</button
+				>
+				{#each [1, 2, 3, 4] as pos}
+					<button
+						type="button"
+						class="rounded-lg px-2.5 py-1 text-xs {posFilter === pos ? 'bg-emerald-500/25 text-emerald-200' : 'bg-slate-800 text-slate-300'}"
+						onclick={() => (posFilter = pos)}>{positionLabel(pos)}</button
+					>
+				{/each}
+			</div>
+
 
 			<input
 				bind:value={q}
@@ -1024,7 +1104,7 @@
 			<p class="text-xs text-slate-500">{filtered.length} מתוך {poolPlayers.length} שחקנים</p>
 
 			<div
-				class="h-[min(70vh,560px)] overflow-auto overscroll-contain rounded-xl border border-slate-800 bg-slate-950/40 {openStatsId != null ? 'overflow-x-visible' : ''}"
+				class="h-[min(70vh,560px)] overflow-auto overscroll-contain rounded-xl border border-slate-800 bg-slate-950/40"
 			>
 				<table class="w-full min-w-[48rem] border-collapse text-right text-xs">
 					<thead class="sticky top-0 z-10 bg-slate-900 text-slate-300 shadow">
@@ -1232,4 +1312,94 @@
 			</div>
 		</div>
 	</div>
+
+	<section class="mt-2 space-y-3 rounded-2xl border border-slate-800 bg-slate-900/40 p-4" aria-label="משחקי מחזור">
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<div>
+				<h2 class="text-lg font-semibold text-emerald-300">משחקי מחזור {viewGw}</h2>
+				<p class="text-xs text-slate-500">תאריך, יום ושעה · ניווט בין מחזורים</p>
+			</div>
+			<nav class="flex flex-wrap items-center gap-2 text-sm" aria-label="ניווט מחזורים במסך הקבוצה">
+				<button
+					type="button"
+					class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-slate-200 hover:border-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-40"
+					disabled={viewGw <= data.minGw}
+					onclick={() => (viewGw = Math.max(data.minGw, viewGw - 1))}
+				>
+					← מחזור קודם
+				</button>
+				<span class="rounded-lg bg-emerald-500/15 px-3 py-1.5 font-semibold text-emerald-300">
+					מחזור {viewGw}
+					{#if viewGw === data.currentGw}
+						<span class="font-normal text-slate-400">· נוכחי</span>
+					{/if}
+				</span>
+				<button
+					type="button"
+					class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-slate-200 hover:border-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-40"
+					disabled={viewGw >= data.maxGw}
+					onclick={() => (viewGw = Math.min(data.maxGw, viewGw + 1))}
+				>
+					מחזור הבא →
+				</button>
+			</nav>
+		</div>
+
+		{#if fixturesByDay.length === 0}
+			<p class="text-sm text-slate-500">אין משחקים במסד למחזור {viewGw}.</p>
+		{:else}
+			<div class="space-y-4">
+				{#each fixturesByDay as group (group.dayKey)}
+					<div class="space-y-2">
+						<h3 class="flex flex-wrap items-baseline gap-2 border-b border-slate-800 pb-1 text-sm">
+							<span class="font-semibold text-white">{group.day}</span>
+							<span class="text-slate-400">{group.date}</span>
+							<span class="text-[11px] text-slate-500">{group.rows.length} משחקים</span>
+						</h3>
+						<ul class="space-y-2">
+							{#each group.rows as row (row.id)}
+								{@const when = formatKickoff(row.kickoff)}
+								<li class="rounded-xl border border-slate-800/80 bg-slate-950/50 px-3 py-2.5">
+									<!-- time | home name | home logo | score | away logo | away name -->
+									<div
+										class="grid grid-cols-[4.25rem_minmax(0,1fr)_2rem_3rem_2rem_minmax(0,1fr)] items-center gap-x-2"
+									>
+										<span class="tabular-nums text-sm font-semibold text-emerald-300">{when.time}</span>
+
+										<span class="truncate text-left text-sm font-medium text-white" title={row.home.name}
+											>{row.home.name}</span
+										>
+										<span
+											class="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white ring-2 {DIFFICULTY_RING[row.away.difficulty]}"
+										>
+											{#if row.home.logoPath}
+												<img src={row.home.logoPath} alt="" class="h-6 w-6 object-contain" />
+											{/if}
+										</span>
+
+										<span class="text-center text-sm font-bold tabular-nums text-white">
+											{#if row.homeScore != null && row.awayScore != null}
+												{row.homeScore}:{row.awayScore}
+											{/if}
+										</span>
+
+										<span
+											class="mx-auto flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white ring-2 {DIFFICULTY_RING[row.home.difficulty]}"
+										>
+											{#if row.away.logoPath}
+												<img src={row.away.logoPath} alt="" class="h-6 w-6 object-contain" />
+											{/if}
+										</span>
+										<span class="truncate text-right text-sm font-medium text-white" title={row.away.name}
+											>{row.away.name}</span
+										>
+									</div>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</section>
 </section>

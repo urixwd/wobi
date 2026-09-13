@@ -1,6 +1,5 @@
 <script lang="ts">
-	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
-	import { formatPrice } from '$lib/format';
+	import CompactPlayerCard from '$lib/components/CompactPlayerCard.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -88,18 +87,14 @@
 						{#each [1, 2, 3, 4] as pos}
 							<div class="flex flex-wrap justify-center gap-2">
 								{#each byPos(opt.xi, pos) as p}
-									<div
-										class="w-[5.5rem] rounded-lg border border-slate-600/60 bg-slate-900/90 px-1.5 py-1 text-center"
-									>
-										<div class="truncate text-[11px] font-medium text-white" title={p.name}>
-											{p.name}
-										</div>
-										<div class="text-[10px] text-amber-200/90">{formatPrice(p.price)}</div>
-										<div class="text-[10px] text-sky-300/90">{p.points} נק׳</div>
-										<div class="mt-0.5 flex justify-center">
-											<FixtureStrip fixtures={p.upcomingFixtures} size="sm" />
-										</div>
-									</div>
+									<CompactPlayerCard
+										name={p.name}
+										price={p.price}
+										points={p.points}
+										logo={p.logo}
+										teamName={p.teamName}
+										upcomingFixtures={p.upcomingFixtures}
+									/>
 								{/each}
 							</div>
 						{/each}
@@ -109,15 +104,15 @@
 						<div class="mb-1 text-xs text-slate-500">ספסל</div>
 						<div class="flex flex-wrap gap-2">
 							{#each opt.bench as p}
-								<div
-									class="min-w-[6rem] flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-2 py-1 text-center"
-								>
-									<div class="text-[10px] text-slate-500">{posLabel[p.position]}</div>
-									<div class="truncate text-xs text-white">{p.name}</div>
-									<div class="text-[10px] text-slate-400">
-										{formatPrice(p.price)} · {p.points} נק׳
-									</div>
-								</div>
+								<CompactPlayerCard
+									variant="bench"
+									name={p.name}
+									price={p.price}
+									points={p.points}
+									logo={p.logo}
+									teamName={p.teamName}
+									positionLabel={posLabel[p.position]}
+								/>
 							{/each}
 						</div>
 					</div>

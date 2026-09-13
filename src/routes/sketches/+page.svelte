@@ -1,9 +1,22 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { positionLabel } from '$lib/positions';
 	import { formatPrice } from '$lib/format';
+	import { isExactSquad, readSquadDraft, type SquadDraft } from '$lib/squadDraft';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	let draft = $state<SquadDraft | null>(null);
+
+	onMount(() => {
+		draft = readSquadDraft();
+	});
+
+	function matchesDraft(s: PageData['sketches'][number]): boolean {
+		if (!draft) return false;
+		return isExactSquad(s.xiPlayerIds, s.benchPlayerIds, draft.xi, draft.bench);
+	}
 </script>
 
 <svelte:head>
@@ -64,11 +77,29 @@
 								· {s.total} שחקנים ({s.xiCount} הרכב / {s.benchCount} ספסל)
 							</p>
 						</div>
-						{#if s.isWip}
-							<span class="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs text-amber-200">WIP</span>
-						{:else}
-							<span class="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs text-emerald-300">מלא</span>
-						{/if}
+						<div class="flex flex-wrap justify-end gap-1.5">
+							{#if s.matchesSaved}
+								<span
+									class="rounded-full bg-sky-500/25 px-2.5 py-1 text-xs font-medium text-sky-200"
+									title="זהה לקבוצה השמורה ב־DB"
+								>
+									= הקבוצה שלי
+								</span>
+							{/if}
+							{#if matchesDraft(s)}
+								<span
+									class="rounded-full bg-violet-500/25 px-2.5 py-1 text-xs font-medium text-violet-200"
+									title="זהה לטיוטה הנוכחית במסך הקבוצה (בטאב הזה)"
+								>
+									= טיוטה נוכחית
+								</span>
+							{/if}
+							{#if s.isWip}
+								<span class="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs text-amber-200">WIP</span>
+							{:else}
+								<span class="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs text-emerald-300">מלא</span>
+							{/if}
+						</div>
 					</div>
 
 					<div class="space-y-2 text-sm">
@@ -102,6 +133,49 @@
 								{/each}
 							</ul>
 						</div>
+					</div>
+
+					<div class="rounded-xl border border-slate-700/80 bg-slate-950/50 p-3">
+						<div class="mb-2 text-xs font-medium text-slate-400">חילופים עד כה</div>
+						{#if s.transfers.out.length === 0 && s.transfers.in.length === 0}
+							<p class="text-xs text-slate-500">אין חילופים מול ההרכב השמור</p>
+						{:else}
+							<div class="grid gap-3 sm:grid-cols-2">
+								<div>
+									<div class="mb-1 text-xs text-red-300">יוצאים ({s.transfers.out.length})</div>
+									<ul class="space-y-1">
+										{#each s.transfers.out as r}
+											<li class="flex items-center justify-between gap-2 rounded-lg bg-red-500/10 px-2 py-1 text-xs">
+												<span class="truncate font-medium">{r.player.name}</span>
+												<span class="shrink-0 text-slate-400"
+													>{positionLabel(r.player.position)} · {formatPrice(r.player.price)}</span
+												>
+											</li>
+										{:else}
+											<li class="text-xs text-slate-500">—</li>
+										{/each}
+									</ul>
+								</div>
+								<div>
+									<div class="mb-1 text-xs text-emerald-300">נכנסים ({s.transfers.in.length})</div>
+									<ul class="space-y-1">
+										{#each s.transfers.in as r}
+											<li class="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 px-2 py-1 text-xs">
+												<span class="truncate font-medium">{r.player.name}</span>
+												<span class="shrink-0 text-slate-400"
+													>{positionLabel(r.player.position)} · {formatPrice(r.player.price)}</span
+												>
+											</li>
+										{:else}
+											<li class="text-xs text-slate-500">—</li>
+										{/each}
+									</ul>
+								</div>
+							</div>
+							<p class="mt-2 text-[11px] text-slate-500">
+								{s.transfers.out.length} יוצאים · {s.transfers.in.length} נכנסים
+							</p>
+						{/if}
 					</div>
 
 					<div class="mt-auto flex flex-wrap gap-2">

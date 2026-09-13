@@ -1,14 +1,22 @@
 /**
- * Upsert teams + players from ./players.json (Sport5 Dream Team dump).
- * Usage: bun run db:import-players
+ * Import a Sport5 Dream Team players dump into Postgres.
+ *
+ * Usage:
+ *   bun run db:import-players -- --gw=5 /path/to/players-gw5.json
+ *   bun run db:import-players -- --gw=4 ./incoming/players.json
+ *
+ * - Upserts live `players` + `teams` (latest view)
+ * - Writes `player_snapshots` for that gameweek (source of truth per round)
+ * - Appends `player_round_stats` for momentum
+ *
+ * The repo does NOT keep players.json — bring a new file each round and import with --gw=N.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { eq, sql } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client';
-import { gameweeks, playerRoundStats, players, teams } from '../src/lib/server/db/schema';
+import { playerRoundStats, playerSnapshots, players, teams } from '../src/lib/server/db/schema';
 import { difficultyForTeamName } from '../src/lib/difficulty';
-
 
 type RawPlayer = {
 	id: number;
@@ -42,7 +50,6 @@ type PlayersFile = {
 	data: RawTeam[];
 };
 
-/** Sport5 prices are raw (e.g. 9000000); we store millions 1–15. */
 function toMillions(price: unknown): number {
 	const n = Number(price) || 0;
 	return n >= 1000 ? Math.round(n / 1_000_000) : n;
@@ -61,10 +68,33 @@ function asBool(v: unknown): boolean {
 	return false;
 }
 
+function parseArgs(argv: string[]) {
+	let gw: number | null = null;
+	let file: string | null = null;
+	for (const a of argv) {
+		if (a.startsWith('--gw=')) gw = Number(a.slice(5));
+		else if (a === '--gw') continue;
+		else if (!a.startsWith('-')) file = a;
+	}
+	// support `--gw 5`
+	for (let i = 0; i < argv.length; i++) {
+		if (argv[i] === '--gw' && argv[i + 1]) gw = Number(argv[i + 1]);
+	}
+	return { gw, file };
+}
+
 async function main() {
-	const path = resolve(process.cwd(), 'players.json');
+	const { gw, file } = parseArgs(process.argv.slice(2));
+	if (!gw || !Number.isFinite(gw) || gw < 1) {
+		throw new Error('Required: --gw=N (e.g. --gw=5). Example: bun run db:import-players -- --gw=5 ./players-gw5.json');
+	}
+	if (!file) {
+		throw new Error('Required: path to Sport5 dump JSON. Example: bun run db:import-players -- --gw=5 ./players-gw5.json');
+	}
+
+	const path = resolve(process.cwd(), file);
 	const raw = JSON.parse(readFileSync(path, 'utf8')) as PlayersFile;
-	if (!raw?.data?.length) throw new Error('players.json missing data[]');
+	if (!raw?.data?.length) throw new Error(`${file} missing data[]`);
 
 	const { db, client } = createDb();
 	let teamCount = 0;
@@ -96,48 +126,91 @@ async function main() {
 			teamCount++;
 
 			for (const p of t.players ?? []) {
-				// 2 = leftover / not in live game pool
 				if (asMissing(p.missingStatus) === 2) continue;
+				const teamId = p.teamId ?? t.id;
+				const row = {
+					id: p.id,
+					teamId,
+					name: p.name,
+					price: toMillions(p.price),
+					shirtNumber: p.shirtNumber ?? null,
+					position: p.position,
+					imagePath: p.imagePath ?? null,
+					teamShirtPath: p.teamShirtPath ?? null,
+					teamLogoPath: p.teamLogoPath ?? null,
+					injuredStatus: asBool(p.injuredStatus),
+					expelledStatus: asBool(p.expelledStatus),
+					missingStatus: asMissing(p.missingStatus),
+					lastRoundPlayerStats: p.lastRoundPlayerStats ?? null,
+					lastSeasonPlayerStats: p.lastSeasonPlayerStats ?? null,
+					updatedAt: new Date(),
+					asOfGameweek: gw
+				};
+
 				await db
 					.insert(players)
-					.values({
-						id: p.id,
-						teamId: p.teamId ?? t.id,
-						name: p.name,
-						price: toMillions(p.price),
-						shirtNumber: p.shirtNumber ?? null,
-						position: p.position,
-						imagePath: p.imagePath ?? null,
-						teamShirtPath: p.teamShirtPath ?? null,
-						teamLogoPath: p.teamLogoPath ?? null,
-						injuredStatus: asBool(p.injuredStatus),
-						expelledStatus: asBool(p.expelledStatus),
-						missingStatus: asMissing(p.missingStatus),
-						lastRoundPlayerStats: p.lastRoundPlayerStats ?? null,
-						lastSeasonPlayerStats: p.lastSeasonPlayerStats ?? null,
-						updatedAt: new Date()
-					})
+					.values(row)
 					.onConflictDoUpdate({
 						target: players.id,
 						set: {
-							teamId: p.teamId ?? t.id,
-							name: p.name,
-							price: toMillions(p.price),
-							shirtNumber: p.shirtNumber ?? null,
-							position: p.position,
-							imagePath: p.imagePath ?? null,
-							teamShirtPath: p.teamShirtPath ?? null,
-							teamLogoPath: p.teamLogoPath ?? null,
-							injuredStatus: asBool(p.injuredStatus),
-							expelledStatus: asBool(p.expelledStatus),
-							missingStatus: asMissing(p.missingStatus),
-							lastRoundPlayerStats: p.lastRoundPlayerStats ?? null,
-							lastSeasonPlayerStats: p.lastSeasonPlayerStats ?? null,
-							updatedAt: new Date()
+							teamId: row.teamId,
+							name: row.name,
+							price: row.price,
+							shirtNumber: row.shirtNumber,
+							position: row.position,
+							imagePath: row.imagePath,
+							teamShirtPath: row.teamShirtPath,
+							teamLogoPath: row.teamLogoPath,
+							injuredStatus: row.injuredStatus,
+							expelledStatus: row.expelledStatus,
+							missingStatus: row.missingStatus,
+							lastRoundPlayerStats: row.lastRoundPlayerStats,
+							lastSeasonPlayerStats: row.lastSeasonPlayerStats,
+							updatedAt: row.updatedAt,
+							asOfGameweek: gw
 						}
 					});
 
-				// Accumulate round history for momentum (from GW 7 UI)
+				await db
+					.insert(playerSnapshots)
+					.values({
+						gameweekNumber: gw,
+						playerId: p.id,
+						teamId,
+						name: row.name,
+						price: row.price,
+						shirtNumber: row.shirtNumber,
+						position: row.position,
+						imagePath: row.imagePath,
+						teamShirtPath: row.teamShirtPath,
+						teamLogoPath: row.teamLogoPath,
+						injuredStatus: row.injuredStatus,
+						expelledStatus: row.expelledStatus,
+						missingStatus: row.missingStatus,
+						lastRoundPlayerStats: row.lastRoundPlayerStats,
+						lastSeasonPlayerStats: row.lastSeasonPlayerStats,
+						capturedAt: new Date()
+					})
+					.onConflictDoUpdate({
+						target: [playerSnapshots.gameweekNumber, playerSnapshots.playerId],
+						set: {
+							teamId,
+							name: row.name,
+							price: row.price,
+							shirtNumber: row.shirtNumber,
+							position: row.position,
+							imagePath: row.imagePath,
+							teamShirtPath: row.teamShirtPath,
+							teamLogoPath: row.teamLogoPath,
+							injuredStatus: row.injuredStatus,
+							expelledStatus: row.expelledStatus,
+							missingStatus: row.missingStatus,
+							lastRoundPlayerStats: row.lastRoundPlayerStats,
+							lastSeasonPlayerStats: row.lastSeasonPlayerStats,
+							capturedAt: new Date()
+						}
+					});
+
 				const lr = p.lastRoundPlayerStats as
 					| {
 							roundId?: number;
@@ -158,7 +231,7 @@ async function main() {
 						try {
 							statsData = JSON.parse(statsData);
 						} catch {
-							/* keep string */
+							/* keep */
 						}
 					}
 					await db
@@ -166,7 +239,7 @@ async function main() {
 						.values({
 							playerId: p.id,
 							sport5RoundId,
-							gameweekNumber: null, // filled below from current GW when possible
+							gameweekNumber: gw,
 							points,
 							seasonPoints: seasonPts,
 							statsData,
@@ -175,6 +248,7 @@ async function main() {
 						.onConflictDoUpdate({
 							target: [playerRoundStats.playerId, playerRoundStats.sport5RoundId],
 							set: {
+								gameweekNumber: gw,
 								points,
 								seasonPoints: seasonPts,
 								statsData,
@@ -187,27 +261,14 @@ async function main() {
 			}
 		}
 
-		// Tag latest snapshots missing gameweek with current GW number (best-effort)
-		const currentGw = (
-			await db.select().from(gameweeks).where(eq(gameweeks.isCurrent, true)).limit(1)
-		)[0];
-		if (currentGw) {
-			await db
-				.update(playerRoundStats)
-				.set({ gameweekNumber: currentGw.number })
-				.where(sql`${playerRoundStats.gameweekNumber} is null`);
-		}
-
-		const [{ count: dbPlayers }] = await db
+		const [{ count: snapCount }] = await db
 			.select({ count: sql<number>`count(*)::int` })
-			.from(players);
-		const [{ count: dbTeams }] = await db.select({ count: sql<number>`count(*)::int` }).from(teams);
+			.from(playerSnapshots)
+			.where(eq(playerSnapshots.gameweekNumber, gw));
 
-		const [{ count: roundRows }] = await db
-			.select({ count: sql<number>`count(*)::int` })
-			.from(playerRoundStats);
-		console.log(`Upserted ${teamCount} teams, ${playerCount} players from players.json`);
-		console.log(`DB now has ${dbTeams} teams, ${dbPlayers} players, ${roundRows} round-stat rows`);
+		console.log(`Imported GW ${gw} from ${path}`);
+		console.log(`Upserted ${teamCount} teams, ${playerCount} live players`);
+		console.log(`Snapshots for GW ${gw}: ${snapCount}`);
 	} finally {
 		await client.end({ timeout: 5 });
 	}

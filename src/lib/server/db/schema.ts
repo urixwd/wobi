@@ -48,7 +48,9 @@ export const players = pgTable('players', {
 	missingStatus: integer('missing_status').notNull().default(0),
 	lastRoundPlayerStats: jsonb('last_round_player_stats'),
 	lastSeasonPlayerStats: jsonb('last_season_player_stats'),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+	/** Which Sport5/Dream Team gameweek this live row reflects */
+	asOfGameweek: integer('as_of_gameweek')
 });
 
 export const gameweeks = pgTable('gameweeks', {
@@ -118,7 +120,7 @@ export const watchlistRound = pgTable(
 );
 
 
-/** Per-round points snapshot for momentum (filled on each players.json import). */
+/** Per-round points snapshot for momentum (filled on each player dump import). */
 export const playerRoundStats = pgTable(
 	'player_round_stats',
 	{
@@ -139,6 +141,36 @@ export const playerRoundStats = pgTable(
 );
 
 export type Team = typeof teams.$inferSelect;
+
+/** Full player row snapshot per gameweek (source of truth per round; live `players` = latest). */
+export const playerSnapshots = pgTable(
+	'player_snapshots',
+	{
+		id: serial('id').primaryKey(),
+		gameweekNumber: integer('gameweek_number').notNull(),
+		playerId: integer('player_id')
+			.notNull()
+			.references(() => players.id),
+		teamId: integer('team_id')
+			.notNull()
+			.references(() => teams.id),
+		name: text('name').notNull(),
+		price: real('price').notNull().default(0),
+		shirtNumber: integer('shirt_number'),
+		position: integer('position').notNull(),
+		imagePath: text('image_path'),
+		teamShirtPath: text('team_shirt_path'),
+		teamLogoPath: text('team_logo_path'),
+		injuredStatus: boolean('injured_status').notNull().default(false),
+		expelledStatus: boolean('expelled_status').notNull().default(false),
+		missingStatus: integer('missing_status').notNull().default(0),
+		lastRoundPlayerStats: jsonb('last_round_player_stats'),
+		lastSeasonPlayerStats: jsonb('last_season_player_stats'),
+		capturedAt: timestamp('captured_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('player_snapshots_gw_player_uidx').on(t.gameweekNumber, t.playerId)]
+);
+
 export type Player = typeof players.$inferSelect;
 export type Gameweek = typeof gameweeks.$inferSelect;
 export type Fixture = typeof fixtures.$inferSelect;
@@ -155,6 +187,22 @@ export const sketches = pgTable('sketches', {
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 });
 
+
+/** Locked/final squad snapshot per gameweek (after deadline). */
+export const finalSquads = pgTable(
+	'final_squads',
+	{
+		id: serial('id').primaryKey(),
+		gameweekNumber: integer('gameweek_number').notNull(),
+		xiPlayerIds: jsonb('xi_player_ids').$type<number[]>().notNull().default([]),
+		benchPlayerIds: jsonb('bench_player_ids').$type<number[]>().notNull().default([]),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('final_squads_gw_uidx').on(t.gameweekNumber)]
+);
+
 export type MySquad = typeof mySquad.$inferSelect;
+export type FinalSquad = typeof finalSquads.$inferSelect;
 export type Sketch = typeof sketches.$inferSelect;
 export type PlayerRoundStats = typeof playerRoundStats.$inferSelect;
+export type PlayerSnapshot = typeof playerSnapshots.$inferSelect;

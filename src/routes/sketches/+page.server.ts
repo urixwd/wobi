@@ -1,14 +1,47 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { players, sketches, teams } from '$lib/server/db/schema';
-import { resolveCurrentGwNumber, MIN_GW, MAX_GW } from '$lib/server/upcomingFixtures';
+import { mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { resolveCurrentGwNumber, MAX_GW } from '$lib/server/upcomingFixtures';
+import { isExactSquad } from '$lib/squadDraft';
 import type { Actions, PageServerLoad } from './$types';
+
+type PlayerRef = {
+	player: typeof players.$inferSelect;
+	teamName: string | null;
+	teamLogo: string | null;
+};
+
+function transferDiff(
+	savedIds: number[],
+	sketchIds: number[],
+	byId: Record<number, PlayerRef>
+) {
+	const saved = new Set(savedIds);
+	const next = new Set(sketchIds);
+	const out = savedIds
+		.filter((id) => !next.has(id))
+		.map((id) => byId[id])
+		.filter(Boolean);
+	const inn = sketchIds
+		.filter((id) => !saved.has(id))
+		.map((id) => byId[id])
+		.filter(Boolean);
+	out.sort(
+		(a, b) =>
+			a.player.position - b.player.position || a.player.name.localeCompare(b.player.name, 'he')
+	);
+	inn.sort(
+		(a, b) =>
+			a.player.position - b.player.position || a.player.name.localeCompare(b.player.name, 'he')
+	);
+	return { out, in: inn };
+}
 
 export const load: PageServerLoad = async ({ url }) => {
 	const current = await resolveCurrentGwNumber(4);
 	const raw = Number(url.searchParams.get('gw') ?? current);
-	const gw = Number.isFinite(raw) ? Math.min(MAX_GW, Math.max(MIN_GW, Math.trunc(raw))) : current;
+	const gw = Number.isFinite(raw) ? Math.min(MAX_GW, Math.max(1, Math.trunc(raw))) : current;
 
 	const list = await db
 		.select()
@@ -16,7 +49,12 @@ export const load: PageServerLoad = async ({ url }) => {
 		.where(eq(sketches.gameweekNumber, gw))
 		.orderBy(desc(sketches.updatedAt));
 
-	const ids = [...new Set(list.flatMap((s) => [...s.xiPlayerIds, ...s.benchPlayerIds]))];
+	const squad = (await db.select().from(mySquad).limit(1))[0];
+	const savedIds = squad ? [...squad.xiPlayerIds, ...squad.benchPlayerIds] : [];
+
+	const ids = [
+		...new Set([...list.flatMap((s) => [...s.xiPlayerIds, ...s.benchPlayerIds]), ...savedIds])
+	];
 	const playerRows =
 		ids.length > 0
 			? await db
@@ -29,24 +67,36 @@ export const load: PageServerLoad = async ({ url }) => {
 					.leftJoin(teams, eq(players.teamId, teams.id))
 					.where(inArray(players.id, ids))
 			: [];
-	const byId = Object.fromEntries(playerRows.map((r) => [r.player.id, r]));
+	const byId = Object.fromEntries(playerRows.map((r) => [r.player.id, r])) as Record<
+		number,
+		PlayerRef
+	>;
 
 	return {
 		gw,
 		currentGw: current,
-		minGw: MIN_GW,
+		minGw: 1,
 		maxGw: MAX_GW,
 		sketches: list.map((s) => {
 			const xiCount = s.xiPlayerIds.length;
 			const benchCount = s.benchPlayerIds.length;
+			const sketchIds = [...s.xiPlayerIds, ...s.benchPlayerIds];
+			const { out, in: inn } = transferDiff(savedIds, sketchIds, byId);
+			const savedXi = squad?.xiPlayerIds ?? [];
+			const savedBench = squad?.benchPlayerIds ?? [];
 			return {
 				...s,
 				xiCount,
 				benchCount,
 				total: xiCount + benchCount,
 				isWip: xiCount < 11 || benchCount < 4,
+				matchesSaved: isExactSquad(s.xiPlayerIds, s.benchPlayerIds, savedXi, savedBench),
 				xiPlayers: s.xiPlayerIds.map((id) => byId[id]).filter(Boolean),
-				benchPlayers: s.benchPlayerIds.map((id) => byId[id]).filter(Boolean)
+				benchPlayers: s.benchPlayerIds.map((id) => byId[id]).filter(Boolean),
+				transfers: {
+					out,
+					in: inn
+				}
 			};
 		})
 	};

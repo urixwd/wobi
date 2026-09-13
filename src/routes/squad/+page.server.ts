@@ -1,10 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { fixtures, gameweeks, mySquad, players, sketches, teams } from '$lib/server/db/schema';
 import {
 	attachUpcoming,
 	getUpcomingFixturesByTeamIds,
+	MAX_GW,
+	MIN_GW,
 	resolveCurrentGwNumber
 } from '$lib/server/upcomingFixtures';
 import type { Actions, PageServerLoad } from './$types';
@@ -66,12 +68,60 @@ export const load: PageServerLoad = async ({ url }) => {
 				)
 			: [];
 
+
+	const allTeams = await db.select().from(teams);
+	const teamsById = new Map(allTeams.map((tm) => [tm.id, tm]));
+	const fixtureRows = await db
+		.select({
+			id: fixtures.id,
+			homeTeamId: fixtures.homeTeamId,
+			awayTeamId: fixtures.awayTeamId,
+			kickoff: fixtures.kickoff,
+			homeScore: fixtures.homeScore,
+			awayScore: fixtures.awayScore,
+			gwNumber: gameweeks.number
+		})
+		.from(fixtures)
+		.innerJoin(gameweeks, eq(fixtures.gameweekId, gameweeks.id))
+		.orderBy(asc(gameweeks.number), asc(fixtures.kickoff), asc(fixtures.id));
+
+	const gwFixtures = fixtureRows.flatMap((f) => {
+		const home = teamsById.get(f.homeTeamId);
+		const away = teamsById.get(f.awayTeamId);
+		if (!home || !away) return [];
+		return [
+			{
+				id: f.id,
+				gwNumber: f.gwNumber,
+				kickoff: f.kickoff,
+				homeScore: f.homeScore,
+				awayScore: f.awayScore,
+				home: {
+					id: home.id,
+					name: home.name,
+					logoPath: home.logoPath,
+					difficulty: home.difficulty
+				},
+				away: {
+					id: away.id,
+					name: away.name,
+					logoPath: away.logoPath,
+					difficulty: away.difficulty
+				}
+			}
+		];
+	});
+
 	return {
 		squad,
 		allPlayers,
 		selected,
 		staged,
-		currentGw
+		currentGw,
+		/** Schedule section can browse finished early rounds; player strip still uses MIN_GW. */
+		minGw: 1,
+		maxGw: MAX_GW,
+		gwFixtures
 	};
 };
 

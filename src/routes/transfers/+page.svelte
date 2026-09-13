@@ -17,7 +17,7 @@
 
 	{#if data.playerCount === 0}
 		<p class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-			אין שחקנים במסד. הריצו <code>bun run db:import-players</code> אחרי שיש players.json בתיקיית הפרויקט.
+			אין שחקנים במסד. הריצו <code>bun run db:import-players -- --gw=N ./dump.json</code>.
 		</p>
 	{:else if !data.squad || data.squad.xiPlayerIds.length === 0}
 		<p class="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm text-slate-300">

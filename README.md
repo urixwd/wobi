@@ -6,17 +6,37 @@ Bun + SvelteKit + Drizzle + Postgres. ממשק עברית RTL לעזרה בחי�
 
 - [Bun](https://bun.sh)
 - Postgres עם מסד בשם **`WOBI`** (case-sensitive)
-- קובץ `players.json` בתיקיית הפרויקט (לא למחוק)
+- נתוני שחקנים ב־DB לפי מחזור (`player_snapshots`; כרגע **GW4**)
+
+## נתוני שחקנים — אין `players.json` בריפו
+
+מקור האמת הוא **Postgres**, לא קובץ JSON בגיט.
+
+| סוג קובץ | מה זה | בגיט? |
+|---|---|---|
+| dump של Sport5 (JSON) | קובץ זמני שמביאים לכל מחזור חדש | **לא** (`players.json` / `players-gw*.json` ב־gitignore) |
+| `db/dumps/latest.sql` | גיבוי מלא של ה־DB (`pg_dump`) | **כן** — commit נפרד של הדאטהבייס |
+
+### עדכון מחזור (חוזר עד סוף העונה)
+1. Uri מביא dump JSON חדש מ־Sport5 (למשל מחזור 5).
+2. ייבוא: `bun run db:import-players -- --gw=5 ./incoming/players-gw5.json`
+3. (אופציונלי) ייצוא בחזרה מה־DB: `bun run db:export-players -- --gw=5`
+4. גיבוי DB לגיט: `bun run db:dump` ואז commit של `db/dumps/latest.sql`
+
+פירוט: [docs/PRODUCT.md](docs/PRODUCT.md) · [docs/TECHNICAL.md](docs/TECHNICAL.md) · [db/README.md](db/README.md)
 
 ## התקנה
 
 ```bash
 cd /Users/uri/projects/hobby/wobi
-cp .env.example .env   # כבר מוגדר ל-postgresql://uri@localhost:5432/WOBI
+cp .env.example .env   # postgresql://uri@localhost:5432/WOBI
 bun install
 bun run db:push
-bun run db:import-players
-bun run db:import-fixtures   # אופציונלי — fixtures.json לדוגמה
+# אם יש dump SQL בריפו:
+# psql "$DATABASE_URL" -f db/dumps/latest.sql
+# או ייבוא JSON למחזור:
+# bun run db:import-players -- --gw=5 ./incoming/players-gw5.json
+bun run db:import-fixtures   # אופציונלי
 bun run dev
 ```
 
@@ -28,16 +48,19 @@ bun run dev
 |---|---|
 | `bun run dev` | שרת פיתוח |
 | `bun run db:push` | דחיפת סכמה ל־WOBI |
-| `bun run db:import-players` | upsert מ־`./players.json` |
-| `bun run db:import-fixtures` | ייבוא מ־`./fixtures.json` + מחזור נוכחי=4 |
+| `bun run db:import-players -- --gw=N ./dump.json` | ייבוא dump Sport5 למחזור N → `players` + `player_snapshots` |
+| `bun run db:export-players -- --gw=N` | בניית JSON דמוי-Sport5 מ־`player_snapshots` |
+| `bun run db:dump` | `pg_dump` → `db/dumps/latest.sql` (+ עותק מתוארך ב־gitignore) |
+| `bun run db:import-fixtures` | ייבוא מ־`./fixtures.json` |
 | `bun run db:studio` | Drizzle Studio |
 
 ## עמודים
 
-1. **הקבוצה שלי** — עריכת XI + ספסל ושמירה  
-2. **מעקב** — watchlist קבוע + רלוונטי למחזור  
-3. **מחזור** — רמזור יריבות (לוגו בטבעת), מחיר, נקודות, זמינות  
-4. **הצעות חילופים** — עד 3 המלצות היוריסטיות  
+1. **הקבוצה שלי** (`/squad`) — ברירת מחדל; XI + ספסל, פילטרים, staged  
+2. **סקיצות** — טיוטות לפי מחזור  
+3. **מחזור** — לוח משחקים + הרכב סופי  
+4. **אפשרויות קבוצה** — עד 3 חילופים מהשמור  
+5. **מעקב / הצעות חילופים** — קיימים; בתפריט נראים כבויים  
 
 ## קושי יריבות
 
@@ -47,17 +70,14 @@ bun run dev
 
 עמדות: 1=שוער, 2=הגנה, 3=קישור, 4=התקפה.
 
-## Fixtures
-
-`fixtures.json` מגיע עם דוגמאות.  
-`scripts/scrape-fixtures.todo.ts` — **TODO** ל־scrape מ־[dreamteam.sport5.co.il](https://dreamteam.sport5.co.il).
-
 ## הערות
 
-- אל תעלו `.env` ל־git (כבר ב־`.gitignore`)
-- אל תמחקו/תדרסו את `players.json` הקיים
+- אל תעלו `.env` ל־git
+- אל תעלו dumps של **Sport5 JSON** לגיט — רק import עם `--gw`
+- כן לעדכן בגיט את **`db/dumps/latest.sql`** אחרי `db:dump` (commit נפרד מהקוד)
 - התעלמו מ־`1st.md` אם קיים
 
 ## Round history / momentum
-Each `bun run db:import-players` upserts into `player_round_stats` from `lastRoundPlayerStats`.
-Momentum UI is planned from **gameweek 7** (needs ~3 stored rounds per player).
+
+כל `db:import-players` מעדכן גם `player_round_stats` מתוך `lastRoundPlayerStats`.  
+UI מומנטום מתוכנן מ־**מחזור 7** (צריך ~3 מחזורים שמורים לשחקן).
