@@ -67,9 +67,33 @@
 	const shownModes = $derived(allModes.filter((m) => selectedModes.includes(m.key)));
 	const singleMode = $derived(shownModes.length === 1);
 
-	// Per-objective collapse (default open).
+	// Per-objective collapse — default all collapsed, persisted locally.
+	// A section is open only when its key is explicitly false.
+	const COLLAPSE_KEY = 'wobi.watchlist.collapsed';
 	let collapsed = $state<Record<string, boolean>>({});
-	const toggleCollapse = (key: string) => (collapsed[key] = !collapsed[key]);
+	let collapseLoaded = $state(false);
+	$effect(() => {
+		if (!collapseLoaded) {
+			collapseLoaded = true;
+			try {
+				const raw = localStorage.getItem(COLLAPSE_KEY);
+				if (raw) {
+					const o = JSON.parse(raw);
+					if (o && typeof o === 'object') collapsed = o;
+				}
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		try {
+			localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed));
+		} catch {
+			/* ignore */
+		}
+	});
+	const isOpen = (key: string) => collapsed[key] === false;
+	const toggleCollapse = (key: string) => (collapsed[key] = isOpen(key) ? true : false);
 
 	function comboStats(c: TransferCombo) {
 		return [
@@ -433,9 +457,9 @@
 							class="flex w-full items-center justify-between gap-2 px-4 py-3 text-right text-xl font-bold text-slate-100 hover:bg-slate-800/50"
 						>
 							<span>{o.title}</span>
-							<span class="text-slate-500">{collapsed[o.key] ? '▸' : '▾'}</span>
+							<span class="text-slate-500">{isOpen(o.key) ? '▾' : '▸'}</span>
 						</button>
-						{#if !collapsed[o.key]}
+						{#if isOpen(o.key)}
 							<div class="grid gap-5 p-3 lg:grid-cols-3">
 								{#each o.variants.filter((v) => selectedModes.includes(v.mode)) as v (v.mode)}
 									{@render card(v.modeLabel, o, v)}
