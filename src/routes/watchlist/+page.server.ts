@@ -7,12 +7,13 @@ import {
 	getUpcomingFixturesByTeamIds,
 	resolveCurrentGwNumber
 } from '$lib/server/upcomingFixtures';
-import { buildTransfers } from '$lib/server/matchdayTransfers';
+import { buildTransfers, OBJECTIVES, type TransferResult } from '$lib/server/matchdayTransfers';
 import {
 	buildTransferInputs,
 	getBaseSquad,
 	getMustIn,
 	getMustOut,
+	MODES,
 	setMustIn,
 	setMustOut
 } from '$lib/server/strategyTracking';
@@ -94,8 +95,29 @@ export const load: PageServerLoad = async () => {
 	const inboundIds = new Set(inboundForPicker.map((p) => p.id));
 	const forcedIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
-	// Marked outs and ins are mandatory; still consider up to 3 transfers total.
-	const transfers = buildTransfers(base, wishlist, new Set(forcedOut), new Set(forcedIn), 3);
+	// Each objective under three constraint modes: constrained (out+in), out-only, free.
+	const modeResults: Record<string, TransferResult> = {
+		constrained: buildTransfers(base, wishlist, new Set(forcedOut), new Set(forcedIn), 3),
+		out: buildTransfers(base, wishlist, new Set(forcedOut), new Set(), 3),
+		free: buildTransfers(base, wishlist, new Set(), new Set(), 3)
+	};
+	const byObjective = OBJECTIVES.map((o) => ({
+		key: o.key,
+		title: o.title,
+		variants: MODES.map((m) => ({
+			mode: m.key,
+			modeLabel: m.short,
+			combo: modeResults[m.key].best.find((b) => b.key === o.key)?.combo ?? null
+		}))
+	}));
+	const transfers = {
+		hasSquad: modeResults.free.hasSquad,
+		feasible: MODES.some((m) => modeResults[m.key].feasible),
+		notes: modeResults.free.feasible ? [] : modeResults.free.notes,
+		capped: MODES.some((m) => modeResults[m.key].capped),
+		byObjective,
+		topPoints: modeResults.constrained.topPoints
+	};
 
 	const squadForPicker = [...base].sort((a, b) => a.position - b.position || b.points - a.points);
 

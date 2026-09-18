@@ -40,6 +40,26 @@ export const STRATEGY_LABELS: Record<string, string> = {
 	actual: 'הבחירה שלי'
 };
 
+/** Each strategy is tracked under three constraint modes. */
+export const MODES = [
+	{ key: 'constrained', label: 'מוגבל (יציאה+כניסה)', short: 'מוגבל' },
+	{ key: 'out', label: 'יציאה בלבד', short: 'יציאה בלבד' },
+	{ key: 'free', label: 'בחירה חופשית', short: 'חופשי' }
+] as const;
+export type ModeKey = (typeof MODES)[number]['key'];
+export const MODE_LABELS: Record<string, string> = Object.fromEntries(
+	MODES.map((m) => [m.key, m.short])
+);
+
+/** strategy_picks.strategy for a variant is `<objective>:<mode>` (or 'actual'). */
+export function strategyKey(objective: string, mode: string): string {
+	return `${objective}:${mode}`;
+}
+export function parseStrategyKey(s: string): { objective: string; mode: string | null } {
+	const i = s.indexOf(':');
+	return i < 0 ? { objective: s, mode: null } : { objective: s.slice(0, i), mode: s.slice(i + 1) };
+}
+
 function matchdayEaseOf(upcoming: UpcomingFixture[], currentGw: number): number {
 	const f = upcoming.find((u) => u.gameweekNumber === currentGw) ?? upcoming[0];
 	if (!f) return 0;
@@ -195,20 +215,23 @@ async function upsertPick(row: {
  * Record the actual team + the 4 strategies' what-if for `currentGw`.
  * Call right after the user's final team is saved into `final_squads[currentGw]`.
  */
-export async function recordWhatIf(currentGw: number): Promise<{ recorded: string[]; released: number[] }> {
+export async function recordWhatIf(currentGw: number): Promise<{ recorded: string[] }> {
 	const current = (
 		await db.select().from(finalSquads).where(eq(finalSquads.gameweekNumber, currentGw)).limit(1)
 	)[0];
-	if (!current) return { recorded: [], released: [] };
+	if (!current) return { recorded: [] };
 	const currentIds = [...current.xiPlayerIds, ...current.benchPlayerIds];
 
 	const { ids: baseIds, fromGw } = await getBaseSquad(currentGw);
 	const released = fromGw != null ? detectReleased(baseIds, currentIds) : [];
-	// Wishlist players the user locked as mandatory incomers (only those not already owned).
-	const mustIn = (await getMustIn(currentGw)).filter((id) => !baseIds.includes(id));
+
+	const { base, wishlist } = await buildTransferInputs(currentGw, baseIds);
+	const inboundIds = new Set(wishlist.map((p) => p.id).filter((id) => !baseIds.includes(id)));
+	// Mandatory picks come from the persisted planners (must_out ⊆ base, must_in ⊆ inbound).
+	const mustOut = (await getMustOut(currentGw)).filter((id) => baseIds.includes(id));
+	const mustIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
 	// Always record the actual team.
-	const { base, wishlist } = await buildTransferInputs(currentGw, baseIds);
 	const actualPlayers = (await buildTransferInputs(currentGw, currentIds)).base;
 	const actualXi = actualPlayers.filter((p) => current.xiPlayerIds.includes(p.id));
 	await upsertPick({
@@ -223,41 +246,32 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	const recorded = ['actual'];
 
 	// No previous matchday → GW5 baseline: only the actual team is stored.
-	if (fromGw == null) return { recorded, released };
+	if (fromGw == null) return { recorded };
 
-	if (released.length === 0 && mustIn.length === 0) {
-		// No transfers and nothing locked in → every strategy equals your team.
-		for (const { key } of OBJECTIVES) {
+	// Record each strategy under three constraint modes.
+	const modeDefs = [
+		{ mode: 'constrained', out: new Set(mustOut), in: new Set(mustIn), rel: mustOut },
+		{ mode: 'out', out: new Set(mustOut), in: new Set<number>(), rel: mustOut },
+		{ mode: 'free', out: new Set<number>(), in: new Set<number>(), rel: [] as number[] }
+	];
+	for (const md of modeDefs) {
+		const res = buildTransfers(base, wishlist, md.out, md.in, 3);
+		for (const b of res.best) {
+			if (!b.combo) continue;
+			const key = strategyKey(b.key, md.mode);
 			await upsertPick({
 				gameweekNumber: currentGw,
 				strategy: key,
-				xiPlayerIds: current.xiPlayerIds,
-				benchPlayerIds: current.benchPlayerIds,
-				formation: formationOf(actualXi),
-				spend: spendOf(actualPlayers),
-				releasedPlayerIds: []
+				xiPlayerIds: b.combo.xi.map((p) => p.id),
+				benchPlayerIds: b.combo.bench.map((p) => p.id),
+				formation: b.combo.formation,
+				spend: b.combo.spend,
+				releasedPlayerIds: md.rel
 			});
 			recorded.push(key);
 		}
-		return { recorded, released };
 	}
-
-	// Released = mandatory outs, mustIn = mandatory incomers; up to 3 transfers total.
-	const res = buildTransfers(base, wishlist, new Set(released), new Set(mustIn), 3);
-	for (const b of res.best) {
-		if (!b.combo) continue;
-		await upsertPick({
-			gameweekNumber: currentGw,
-			strategy: b.key,
-			xiPlayerIds: b.combo.xi.map((p) => p.id),
-			benchPlayerIds: b.combo.bench.map((p) => p.id),
-			formation: b.combo.formation,
-			spend: b.combo.spend,
-			releasedPlayerIds: released
-		});
-		recorded.push(b.key);
-	}
-	return { recorded, released };
+	return { recorded };
 }
 
 /** XI round points for round N come from the dump taken after it: snapshot[N+1]. */
@@ -292,26 +306,30 @@ export async function scoreRound(
 
 export type StandingSeries = {
 	key: string;
-	label: string;
+	objective: string;
+	mode: string | null; // null for 'actual'
+	label: string; // objective label
+	modeLabel: string | null;
 	total: number;
 	perGw: { gw: number; points: number; cumulative: number }[];
 };
 export type Standings = {
 	gameweeks: number[]; // scored gameweeks, ascending
-	series: StandingSeries[]; // 'actual' first, then strategies by total desc
+	series: StandingSeries[]; // 'actual' first, then variants by total desc
 	leader: string | null;
 };
 
 export async function getStandings(): Promise<Standings> {
-	const rows = await db
-		.select()
-		.from(strategyPicks)
-		.orderBy(asc(strategyPicks.gameweekNumber));
+	const rows = await db.select().from(strategyPicks).orderBy(asc(strategyPicks.gameweekNumber));
 	const scored = rows.filter((r) => r.points != null);
 	const gameweeks = [...new Set(scored.map((r) => r.gameweekNumber))].sort((a, b) => a - b);
 
-	const keys = ['actual', ...OBJECTIVES.map((o) => o.key)];
+	// Every strategy key that appears in the scored data (plus 'actual').
+	const keys = [...new Set(scored.map((r) => r.strategy))];
+	if (!keys.includes('actual') && gameweeks.length) keys.push('actual');
+
 	const series: StandingSeries[] = keys.map((key) => {
+		const { objective, mode } = parseStrategyKey(key);
 		let cumulative = 0;
 		const perGw = gameweeks.map((gw) => {
 			const row = scored.find((r) => r.gameweekNumber === gw && r.strategy === key);
@@ -319,15 +337,22 @@ export async function getStandings(): Promise<Standings> {
 			cumulative += points;
 			return { gw, points, cumulative };
 		});
-		return { key, label: STRATEGY_LABELS[key] ?? key, total: cumulative, perGw };
+		return {
+			key,
+			objective,
+			mode,
+			label: STRATEGY_LABELS[objective] ?? objective,
+			modeLabel: mode ? MODE_LABELS[mode] ?? mode : null,
+			total: cumulative,
+			perGw
+		};
 	});
 
-	const strategiesOnly = series.filter((s) => s.key !== 'actual');
-	const leaderSeries = [...series].sort((a, b) => b.total - a.total)[0];
+	const leader = [...series].sort((a, b) => b.total - a.total)[0]?.key ?? null;
 	const ordered = [
-		series.find((s) => s.key === 'actual')!,
-		...strategiesOnly.sort((a, b) => b.total - a.total)
-	].filter(Boolean);
+		...series.filter((s) => s.key === 'actual'),
+		...series.filter((s) => s.key !== 'actual').sort((a, b) => b.total - a.total)
+	];
 
-	return { gameweeks, series: ordered, leader: gameweeks.length ? leaderSeries?.key ?? null : null };
+	return { gameweeks, series: ordered, leader: gameweeks.length ? leader : null };
 }
