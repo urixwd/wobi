@@ -1,5 +1,5 @@
 -- WOBI Postgres dump
--- generated: 2026-09-18T08:44:27.575Z
+-- generated: 2026-09-18T11:18:55.871Z
 -- source: DATABASE_URL (credentials redacted)
 -- restore: psql "$DATABASE_URL" -f db/dumps/latest.sql
 
@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HpUOEzJFAIRFBnV2Ct14jha1CZutZhgDNvG9CDLM4AyHdIAjABVRgYt5t0Dl380
+\restrict ld82YE5omnJLnk0X5fxi09foJBnUnapIGlQZGJuXhhsJHdPMFjAFCunwwTorNuJ
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -35,12 +35,14 @@ ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_ga
 ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_away_team_id_teams_id_fk;
 DROP INDEX IF EXISTS public.watchlist_round_player_uidx;
 DROP INDEX IF EXISTS public.watchlist_permanent_player_uidx;
+DROP INDEX IF EXISTS public.strategy_picks_gw_strategy_uidx;
 DROP INDEX IF EXISTS public.player_snapshots_gw_player_uidx;
 DROP INDEX IF EXISTS public.player_round_stats_player_s5_uidx;
 DROP INDEX IF EXISTS public.final_squads_gw_uidx;
 ALTER TABLE IF EXISTS ONLY public.watchlist_round DROP CONSTRAINT IF EXISTS watchlist_round_pkey;
 ALTER TABLE IF EXISTS ONLY public.watchlist_permanent DROP CONSTRAINT IF EXISTS watchlist_permanent_pkey;
 ALTER TABLE IF EXISTS ONLY public.teams DROP CONSTRAINT IF EXISTS teams_pkey;
+ALTER TABLE IF EXISTS ONLY public.strategy_picks DROP CONSTRAINT IF EXISTS strategy_picks_pkey;
 ALTER TABLE IF EXISTS ONLY public.sketches DROP CONSTRAINT IF EXISTS sketches_pkey;
 ALTER TABLE IF EXISTS ONLY public.players DROP CONSTRAINT IF EXISTS players_pkey;
 ALTER TABLE IF EXISTS ONLY public.player_snapshots DROP CONSTRAINT IF EXISTS player_snapshots_pkey;
@@ -52,6 +54,7 @@ ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_pk
 ALTER TABLE IF EXISTS ONLY public.final_squads DROP CONSTRAINT IF EXISTS final_squads_pkey;
 ALTER TABLE IF EXISTS public.watchlist_round ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.watchlist_permanent ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.strategy_picks ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.sketches ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_snapshots ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_round_stats ALTER COLUMN id DROP DEFAULT;
@@ -64,6 +67,8 @@ DROP TABLE IF EXISTS public.watchlist_round;
 DROP SEQUENCE IF EXISTS public.watchlist_permanent_id_seq;
 DROP TABLE IF EXISTS public.watchlist_permanent;
 DROP TABLE IF EXISTS public.teams;
+DROP SEQUENCE IF EXISTS public.strategy_picks_id_seq;
+DROP TABLE IF EXISTS public.strategy_picks;
 DROP SEQUENCE IF EXISTS public.sketches_id_seq;
 DROP TABLE IF EXISTS public.sketches;
 DROP TABLE IF EXISTS public.players;
@@ -370,6 +375,45 @@ ALTER SEQUENCE public.sketches_id_seq OWNED BY public.sketches.id;
 
 
 --
+-- Name: strategy_picks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.strategy_picks (
+    id integer NOT NULL,
+    gameweek_number integer NOT NULL,
+    strategy text NOT NULL,
+    xi_player_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    bench_player_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    formation text,
+    spend real,
+    released_player_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    points real,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: strategy_picks_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.strategy_picks_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: strategy_picks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.strategy_picks_id_seq OWNED BY public.strategy_picks.id;
+
+
+--
 -- Name: teams; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -495,6 +539,13 @@ ALTER TABLE ONLY public.player_snapshots ALTER COLUMN id SET DEFAULT nextval('pu
 --
 
 ALTER TABLE ONLY public.sketches ALTER COLUMN id SET DEFAULT nextval('public.sketches_id_seq'::regclass);
+
+
+--
+-- Name: strategy_picks id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.strategy_picks ALTER COLUMN id SET DEFAULT nextval('public.strategy_picks_id_seq'::regclass);
 
 
 --
@@ -749,7 +800,7 @@ COPY public.gameweeks (id, number, label, is_current, starts_at, ends_at) FROM s
 --
 
 COPY public.my_squad (id, name, xi_player_ids, bench_player_ids, free_transfers, updated_at) FROM stdin;
-1	ברירת מחדל	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	3	2026-09-13 18:57:27.876+02
+1	ברירת מחדל	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	3	2026-09-18 13:06:12.975437+02
 \.
 
 
@@ -2625,6 +2676,19 @@ COPY public.players (id, team_id, name, price, shirt_number, "position", image_p
 COPY public.sketches (id, name, gameweek_number, xi_player_ids, bench_player_ids, notes, created_at, updated_at) FROM stdin;
 2	סקיצה מחזור 4	4	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 6630]	[4900, 2779, 3732, 6604]	\N	2026-09-13 18:23:39.341584+02	2026-09-13 18:23:39.341584+02
 3	סקיצה מחזור 4	4	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	\N	2026-09-13 18:42:00.746096+02	2026-09-13 18:42:00.746096+02
+4	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 521, 3699, 3664, 3474]	[4900, 2779, 3732, 6604]	\N	2026-09-18 11:25:59.511722+02	2026-09-18 11:25:59.511722+02
+5	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 521, 3474, 7257, 6630]	[4900, 2779, 3732, 6604]	\N	2026-09-18 11:55:46.837739+02	2026-09-18 11:55:46.837739+02
+6	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 521, 3474, 7257, 424]	[4900, 2779, 3732, 6604]	\N	2026-09-18 12:13:29.640225+02	2026-09-18 12:13:29.640225+02
+7	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 3699, 3664, 3474]	[4900, 2779, 3732, 2902]	\N	2026-09-18 12:31:35.642517+02	2026-09-18 12:31:35.642517+02
+9	מקסימום נקודות · מחזור 5	5	[6637, 1835, 824, 3743, 551, 6587, 1859, 521, 2902, 464, 4635]	[4900, 2779, 3732, 6604]	\N	2026-09-18 12:56:41.977449+02	2026-09-18 12:56:41.977449+02
+\.
+
+
+--
+-- Data for Name: strategy_picks; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.strategy_picks (id, gameweek_number, strategy, xi_player_ids, bench_player_ids, formation, spend, released_player_ids, points, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -2655,6 +2719,22 @@ COPY public.teams (id, name, logo_path, shirt_path, page_link, difficulty) FROM 
 --
 
 COPY public.watchlist_permanent (id, player_id, notes, created_at) FROM stdin;
+4	6587	\N	2026-09-18 11:16:51.488401+02
+6	3474	\N	2026-09-18 11:17:10.409312+02
+7	522	\N	2026-09-18 11:36:07.87152+02
+8	824	\N	2026-09-18 11:36:13.604522+02
+9	6681	\N	2026-09-18 11:36:31.451243+02
+10	3488	\N	2026-09-18 11:36:39.744973+02
+11	1859	\N	2026-09-18 11:36:44.626341+02
+19	6669	\N	2026-09-18 11:47:39.15807+02
+20	493	\N	2026-09-18 11:48:28.824712+02
+21	7257	\N	2026-09-18 11:48:30.571644+02
+22	4635	\N	2026-09-18 11:48:48.47391+02
+23	521	\N	2026-09-18 11:48:56.745784+02
+24	6630	\N	2026-09-18 11:56:01.349548+02
+25	3743	\N	2026-09-18 12:18:13.879561+02
+26	2902	\N	2026-09-18 12:18:51.245632+02
+27	464	\N	2026-09-18 12:36:55.221095+02
 \.
 
 
@@ -2663,6 +2743,16 @@ COPY public.watchlist_permanent (id, player_id, notes, created_at) FROM stdin;
 --
 
 COPY public.watchlist_round (id, player_id, gameweek_number, notes, created_at) FROM stdin;
+33	824	5	\N	2026-09-18 11:46:50.164836+02
+34	3474	5	\N	2026-09-18 11:46:51.122814+02
+37	6681	5	\N	2026-09-18 11:46:54.652057+02
+38	522	5	\N	2026-09-18 11:46:55.153881+02
+43	7257	5	\N	2026-09-18 11:48:14.366472+02
+44	493	5	\N	2026-09-18 11:48:19.675245+02
+46	6630	5	\N	2026-09-18 11:55:59.525785+02
+47	2902	5	\N	2026-09-18 12:18:49.685785+02
+48	424	5	\N	2026-09-18 12:22:24.834144+02
+49	464	5	\N	2026-09-18 12:36:53.661866+02
 \.
 
 
@@ -2670,7 +2760,7 @@ COPY public.watchlist_round (id, player_id, gameweek_number, notes, created_at) 
 -- Name: final_squads_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.final_squads_id_seq', 1, true);
+SELECT pg_catalog.setval('public.final_squads_id_seq', 4, true);
 
 
 --
@@ -2712,21 +2802,28 @@ SELECT pg_catalog.setval('public.player_snapshots_id_seq', 826, true);
 -- Name: sketches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.sketches_id_seq', 3, true);
+SELECT pg_catalog.setval('public.sketches_id_seq', 9, true);
+
+
+--
+-- Name: strategy_picks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.strategy_picks_id_seq', 11, true);
 
 
 --
 -- Name: watchlist_permanent_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.watchlist_permanent_id_seq', 3, true);
+SELECT pg_catalog.setval('public.watchlist_permanent_id_seq', 27, true);
 
 
 --
 -- Name: watchlist_round_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.watchlist_round_id_seq', 1, false);
+SELECT pg_catalog.setval('public.watchlist_round_id_seq', 49, true);
 
 
 --
@@ -2802,6 +2899,14 @@ ALTER TABLE ONLY public.sketches
 
 
 --
+-- Name: strategy_picks strategy_picks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.strategy_picks
+    ADD CONSTRAINT strategy_picks_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2844,6 +2949,13 @@ CREATE UNIQUE INDEX player_round_stats_player_s5_uidx ON public.player_round_sta
 --
 
 CREATE UNIQUE INDEX player_snapshots_gw_player_uidx ON public.player_snapshots USING btree (gameweek_number, player_id);
+
+
+--
+-- Name: strategy_picks_gw_strategy_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX strategy_picks_gw_strategy_uidx ON public.strategy_picks USING btree (gameweek_number, strategy);
 
 
 --
@@ -2936,5 +3048,5 @@ ALTER TABLE ONLY public.watchlist_round
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HpUOEzJFAIRFBnV2Ct14jha1CZutZhgDNvG9CDLM4AyHdIAjABVRgYt5t0Dl380
+\unrestrict ld82YE5omnJLnk0X5fxi09foJBnUnapIGlQZGJuXhhsJHdPMFjAFCunwwTorNuJ
 
