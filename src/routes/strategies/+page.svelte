@@ -13,6 +13,8 @@
 		form: '#fb7185'
 	};
 	const colorOf = (key: string) => COLORS[key] ?? '#94a3b8';
+	const actualTotal = $derived(st.series.find((s) => s.key === 'actual')?.total ?? 0);
+	const fmtDelta = (d: number) => (d > 0 ? `+${d}` : `${d}`);
 
 	// Chart geometry (viewBox units; scales responsively).
 	const W = 720;
@@ -86,6 +88,20 @@
 					</div>
 					<div class="mt-1 text-2xl font-bold" style="color:{colorOf(s.key)}">{s.total}</div>
 					<div class="text-[11px] text-slate-500">נק׳ מצטבר</div>
+					{#if s.key === 'actual'}
+						<div class="text-[11px] text-slate-500">הבחירות שלך בפועל</div>
+					{:else}
+						{@const d = s.total - actualTotal}
+						<div
+							class="text-[11px] font-medium {d > 0
+								? 'text-emerald-300'
+								: d < 0
+									? 'text-red-300'
+									: 'text-slate-400'}"
+						>
+							{fmtDelta(d)} מול הבחירה שלך
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
