@@ -1,5 +1,5 @@
 -- WOBI Postgres dump
--- generated: 2026-09-18T11:36:55.736Z
+-- generated: 2026-09-18T12:35:34.817Z
 -- source: DATABASE_URL (credentials redacted)
 -- restore: psql "$DATABASE_URL" -f db/dumps/latest.sql
 
@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fx4iMvj8FMNaqRrfqD6hx6T48DBwxoIUcIPiy0oZBeTNpEjsafdQdoQWbEuXHyy
+\restrict mdLC1ClAVE0QKSTOiAFeNyThB2GrpAUjNcpZvWxmGaHHuH7P0Fskuk1hwZ82iRw
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -613,6 +613,7 @@ ALTER TABLE ONLY public.watchlist_round ALTER COLUMN id SET DEFAULT nextval('pub
 
 COPY public.final_squads (id, gameweek_number, xi_player_ids, bench_player_ids, updated_at) FROM stdin;
 1	4	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	2026-09-13 19:07:13.056337+02
+7	5	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	2026-09-18 14:35:03.918+02
 \.
 
 
@@ -845,7 +846,7 @@ COPY public.gameweeks (id, number, label, is_current, starts_at, ends_at) FROM s
 --
 
 COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at, must_out_ids) FROM stdin;
-7	5	[3474, 7257]	2026-09-18 13:36:39.344483+02	[]
+7	5	[3474]	2026-09-18 14:08:39.829+02	[3699, 2732]
 \.
 
 
@@ -854,7 +855,7 @@ COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at, must_ou
 --
 
 COPY public.my_squad (id, name, xi_player_ids, bench_player_ids, free_transfers, updated_at) FROM stdin;
-1	ברירת מחדל	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	3	2026-09-18 13:06:12.975437+02
+1	ברירת מחדל	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	3	2026-09-18 14:35:03.916+02
 \.
 
 
@@ -2735,6 +2736,10 @@ COPY public.sketches (id, name, gameweek_number, xi_player_ids, bench_player_ids
 6	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 521, 3474, 7257, 424]	[4900, 2779, 3732, 6604]	\N	2026-09-18 12:13:29.640225+02	2026-09-18 12:13:29.640225+02
 7	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 3699, 3664, 3474]	[4900, 2779, 3732, 2902]	\N	2026-09-18 12:31:35.642517+02	2026-09-18 12:31:35.642517+02
 9	מקסימום נקודות · מחזור 5	5	[6637, 1835, 824, 3743, 551, 6587, 1859, 521, 2902, 464, 4635]	[4900, 2779, 3732, 6604]	\N	2026-09-18 12:56:41.977449+02	2026-09-18 12:56:41.977449+02
+10	מקסימום נקודות · מוגבל · מחזור 5	5	[6637, 1835, 3664, 3743, 551, 6587, 3474, 1859, 521, 2902, 4635]	[4900, 2779, 3732, 424]	\N	2026-09-18 14:05:25.534537+02	2026-09-18 14:05:25.534537+02
+11	סקיצה מחזור 5	5	[6637, 1835, 3664, 3743, 6587, 551, 3474, 1859, 2902, 4635, 424]	[4900, 2779, 3732, 6604]	\N	2026-09-18 14:06:30.346022+02	2026-09-18 14:06:30.346022+02
+12	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 6587, 521, 3474, 824, 464]	[4900, 2779, 3732, 6604]	\N	2026-09-18 14:19:27.762367+02	2026-09-18 14:19:27.762367+02
+13	סקיצה מחזור 5	5	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	\N	2026-09-18 14:26:04.595366+02	2026-09-18 14:26:04.595366+02
 \.
 
 
@@ -2743,6 +2748,22 @@ COPY public.sketches (id, name, gameweek_number, xi_player_ids, bench_player_ids
 --
 
 COPY public.strategy_picks (id, gameweek_number, strategy, xi_player_ids, bench_player_ids, formation, spend, released_player_ids, points, created_at, updated_at) FROM stdin;
+25	5	actual	[6637, 3743, 1835, 1859, 551, 4635, 2732, 6587, 521, 3699, 3664]	[4900, 2779, 3732, 6604]	3-4-3	113	[]	\N	2026-09-18 14:29:09.328006+02	2026-09-18 14:35:03.926+02
+27	5	points:constrained	[6637, 1835, 824, 3664, 3743, 551, 6587, 3474, 521, 2902, 4635]	[4900, 2779, 3732, 6604]	4-4-2	112	[3699, 2732]	\N	2026-09-18 14:35:03.93365+02	2026-09-18 14:35:03.93365+02
+28	5	vlfm:constrained	[6637, 1835, 824, 3664, 2779, 6587, 551, 3474, 1859, 2902, 4635]	[4900, 3743, 3732, 6604]	4-4-2	110	[3699, 2732]	\N	2026-09-18 14:35:03.934616+02	2026-09-18 14:35:03.934616+02
+29	5	fixtures:constrained	[6637, 1835, 824, 3664, 3743, 6587, 551, 3474, 1859, 2902, 4635]	[4900, 2779, 3732, 6604]	4-4-2	110	[3699, 2732]	\N	2026-09-18 14:35:03.936219+02	2026-09-18 14:35:03.936219+02
+30	5	fixtures5:constrained	[4900, 1835, 824, 3664, 3743, 6630, 551, 6587, 3474, 521, 4635]	[6637, 2779, 3732, 6604]	5-4-1	116	[3699, 2732]	\N	2026-09-18 14:35:03.936758+02	2026-09-18 14:35:03.936758+02
+31	5	form:constrained	[6637, 1835, 3664, 2779, 551, 3474, 522, 1859, 521, 2902, 4635]	[4900, 3743, 3732, 6604]	3-5-2	106	[3699, 2732]	\N	2026-09-18 14:35:03.937286+02	2026-09-18 14:35:03.937286+02
+32	5	points:out	[6637, 1835, 824, 3664, 551, 6587, 6681, 1859, 521, 2902, 4635]	[4900, 2779, 3732, 6604]	3-5-2	108	[3699, 2732]	\N	2026-09-18 14:35:03.948908+02	2026-09-18 14:35:03.948908+02
+33	5	vlfm:out	[6637, 1835, 824, 3664, 3743, 2779, 6587, 551, 1859, 2902, 4635]	[4900, 6630, 3732, 6604]	5-3-2	104	[3699, 2732]	\N	2026-09-18 14:35:03.949672+02	2026-09-18 14:35:03.949672+02
+34	5	fixtures:out	[6637, 1835, 824, 3664, 3743, 6630, 6587, 551, 1859, 2902, 4635]	[4900, 2779, 3732, 6604]	5-3-2	104	[3699, 2732]	\N	2026-09-18 14:35:03.950116+02	2026-09-18 14:35:03.950116+02
+35	5	fixtures5:out	[4900, 1835, 824, 3664, 3743, 6630, 551, 6587, 3474, 521, 4635]	[6637, 2779, 3732, 6604]	5-4-1	116	[3699, 2732]	\N	2026-09-18 14:35:03.950565+02	2026-09-18 14:35:03.950565+02
+36	5	form:out	[6637, 1835, 3664, 2779, 551, 522, 3474, 1859, 521, 2902, 4635]	[4900, 3743, 3732, 6604]	3-5-2	106	[3699, 2732]	\N	2026-09-18 14:35:03.951008+02	2026-09-18 14:35:03.951008+02
+37	5	points:free	[6637, 1835, 824, 3664, 551, 6587, 6681, 521, 2902, 4635, 3699]	[4900, 2779, 3732, 6604]	3-4-3	114	[]	\N	2026-09-18 14:35:04.120894+02	2026-09-18 14:35:04.120894+02
+38	5	vlfm:free	[6637, 1835, 824, 3664, 3743, 2779, 6587, 551, 1859, 2902, 4635]	[4900, 6630, 3732, 6604]	5-3-2	104	[]	\N	2026-09-18 14:35:04.12195+02	2026-09-18 14:35:04.12195+02
+39	5	fixtures:free	[6637, 1835, 824, 3743, 6630, 6587, 551, 1859, 2902, 2732, 3699]	[4900, 2779, 3732, 6604]	4-3-3	109	[]	\N	2026-09-18 14:35:04.122474+02	2026-09-18 14:35:04.122474+02
+40	5	fixtures5:free	[4900, 1835, 824, 3664, 3743, 6630, 551, 3474, 521, 4635, 3699]	[6637, 2779, 3732, 6604]	5-3-2	116	[]	\N	2026-09-18 14:35:04.122857+02	2026-09-18 14:35:04.122857+02
+41	5	form:free	[6637, 1835, 3664, 2779, 551, 522, 3474, 521, 2902, 4635, 3699]	[4900, 3743, 3732, 6604]	3-4-3	112	[]	\N	2026-09-18 14:35:04.123219+02	2026-09-18 14:35:04.123219+02
 \.
 
 
@@ -2814,7 +2835,7 @@ COPY public.watchlist_round (id, player_id, gameweek_number, notes, created_at) 
 -- Name: final_squads_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.final_squads_id_seq', 4, true);
+SELECT pg_catalog.setval('public.final_squads_id_seq', 8, true);
 
 
 --
@@ -2835,7 +2856,7 @@ SELECT pg_catalog.setval('public.gameweeks_id_seq', 54, true);
 -- Name: matchday_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.matchday_plan_id_seq', 7, true);
+SELECT pg_catalog.setval('public.matchday_plan_id_seq', 13, true);
 
 
 --
@@ -2863,14 +2884,14 @@ SELECT pg_catalog.setval('public.player_snapshots_id_seq', 826, true);
 -- Name: sketches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.sketches_id_seq', 9, true);
+SELECT pg_catalog.setval('public.sketches_id_seq', 13, true);
 
 
 --
 -- Name: strategy_picks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.strategy_picks_id_seq', 11, true);
+SELECT pg_catalog.setval('public.strategy_picks_id_seq', 41, true);
 
 
 --
@@ -3124,5 +3145,5 @@ ALTER TABLE ONLY public.watchlist_round
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fx4iMvj8FMNaqRrfqD6hx6T48DBwxoIUcIPiy0oZBeTNpEjsafdQdoQWbEuXHyy
+\unrestrict mdLC1ClAVE0QKSTOiAFeNyThB2GrpAUjNcpZvWxmGaHHuH7P0Fskuk1hwZ82iRw
 
