@@ -1,7 +1,8 @@
 import { fail } from '@sveltejs/kit';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { fixtures, gameweeks, mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { finalSquads, fixtures, gameweeks, mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { recordWhatIf } from '$lib/server/strategyTracking';
 import {
 	attachUpcoming,
 	getUpcomingFixturesByTeamIds,
@@ -153,6 +154,21 @@ export const actions: Actions = {
 				updatedAt: new Date()
 			})
 			.where(eq(mySquad.id, squad.id));
+
+		// Snapshot this matchday's team + record the what-if for strategy tracking (GW5 on).
+		const currentGw = await resolveCurrentGwNumber(4);
+		await db
+			.insert(finalSquads)
+			.values({ gameweekNumber: currentGw, xiPlayerIds: xi, benchPlayerIds: bench })
+			.onConflictDoUpdate({
+				target: finalSquads.gameweekNumber,
+				set: { xiPlayerIds: xi, benchPlayerIds: bench, updatedAt: new Date() }
+			});
+		try {
+			await recordWhatIf(currentGw);
+		} catch (e) {
+			console.error('recordWhatIf failed', e);
+		}
 
 		return { success: true };
 	},

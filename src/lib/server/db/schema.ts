@@ -201,8 +201,35 @@ export const finalSquads = pgTable(
 	(t) => [uniqueIndex('final_squads_gw_uidx').on(t.gameweekNumber)]
 );
 
+/**
+ * What-if tracking: per matchday, the #1 team each strategy would field, plus
+ * the user's actual team (strategy = 'actual'). `points` is filled once the
+ * round is scored (during the next matchday's import). Tracked from GW5 on.
+ */
+export const strategyPicks = pgTable(
+	'strategy_picks',
+	{
+		id: serial('id').primaryKey(),
+		gameweekNumber: integer('gameweek_number').notNull(),
+		/** 'points' | 'vlfm' | 'fixtures' | 'form' | 'actual' */
+		strategy: text('strategy').notNull(),
+		xiPlayerIds: jsonb('xi_player_ids').$type<number[]>().notNull().default([]),
+		benchPlayerIds: jsonb('bench_player_ids').$type<number[]>().notNull().default([]),
+		formation: text('formation'),
+		spend: real('spend'),
+		/** Player ids released vs the previous matchday (the freed slots). */
+		releasedPlayerIds: jsonb('released_player_ids').$type<number[]>().notNull().default([]),
+		/** XI round points; null until the round is scored. */
+		points: real('points'),
+		createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('strategy_picks_gw_strategy_uidx').on(t.gameweekNumber, t.strategy)]
+);
+
 export type MySquad = typeof mySquad.$inferSelect;
 export type FinalSquad = typeof finalSquads.$inferSelect;
 export type Sketch = typeof sketches.$inferSelect;
 export type PlayerRoundStats = typeof playerRoundStats.$inferSelect;
 export type PlayerSnapshot = typeof playerSnapshots.$inferSelect;
+export type StrategyPick = typeof strategyPicks.$inferSelect;

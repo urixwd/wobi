@@ -16,6 +16,7 @@
 		"db:studio": "bun --env-file=.env drizzle-kit studio",
 		"db:import-players": "bun --env-file=.env run scripts/import-players.ts",
 		"db:import-fixtures": "bun --env-file=.env run scripts/import-fixtures.ts",
+		"db:score-strategies": "bun --env-file=.env run scripts/score-strategies.ts",
 		"db:export-players": "bun --env-file=.env run scripts/export-players.ts",
 		"db:dump": "bun --env-file=.env run scripts/dump-db.ts",
 		"db:localize-assets": "bun --env-file=.env run scripts/localize-assets.ts"
