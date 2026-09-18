@@ -18,10 +18,11 @@ Bun + SvelteKit + Drizzle + Postgres. ממשק עברית RTL לעזרה בחי�
 | `db/dumps/latest.sql` | גיבוי מלא של ה־DB (`pg_dump`) | **כן** — commit נפרד של הדאטהבייס |
 
 ### עדכון מחזור (חוזר עד סוף העונה)
-1. Uri מביא dump JSON חדש מ־Sport5 (למשל מחזור 5).
-2. ייבוא: `bun run db:import-players -- --gw=5 ./incoming/players-gw5.json`
-3. (אופציונלי) ייצוא בחזרה מה־DB: `bun run db:export-players -- --gw=5`
-4. גיבוי DB לגיט: `bun run db:dump` ואז commit של `db/dumps/latest.sql`
+הצ׳קליסט המלא, כולל **תוצאות** של המחזור שהסתיים: [docs/NEW-GAMEWEEK.md](docs/NEW-GAMEWEEK.md).
+
+1. dump שחקנים (לא בגיט): `bun run db:import-players -- --gw=P ./incoming/players-gwP.json`
+2. תוצאות: לעדכן `fixtures.json` (לוח מלא שכבר בגיט) ואז `bun run db:import-fixtures` — הסקריפט מוחק את כל המשחקים ומייבא מחדש, אז אסור קובץ חלקי
+3. `bun run db:dump` ואז commit של `fixtures.json`, ו־commit נפרד של `db/dumps/latest.sql`
 
 פירוט: [docs/PRODUCT.md](docs/PRODUCT.md) · [docs/TECHNICAL.md](docs/TECHNICAL.md) · [db/README.md](db/README.md)
 

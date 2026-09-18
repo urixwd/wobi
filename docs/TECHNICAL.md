@@ -46,9 +46,12 @@ Gitignore: `players.json`, `players-gw*.json`, `incoming/`, `exports/`.
 `dev` · `check` · `db:push` · `db:dump` · `db:import-players` · `db:export-players` · `db:import-fixtures` · `db:studio`
 
 ## Season workflow (ops)
-1. Today: GW4 seeded into `player_snapshots`.
-2. When Uri delivers GW5 dump → import with `--gw=5` (updates live `players` + snapshot 5).
-3. Repeat through GW26.
+Full checklist: [docs/NEW-GAMEWEEK.md](NEW-GAMEWEEK.md).
+
+- Player dump is ephemeral. `--gw` is the gameweek the dump represents (`as_of_gameweek` + `player_snapshots`), usually the round *after* the one that just finished. Confirm with Uri; do not guess.
+- Results live in tracked `fixtures.json` (full season, GW1–26). Fill `homeScore`/`awayScore` for the finished round and set `currentRound` to the next one, then `bun run db:import-fixtures`.
+- `db:import-fixtures` **deletes every fixture row** and reinserts from that file. Never point it at a partial file.
+- Starting point in git: player snapshot GW4 only; fixture scores filled for GW1–3; GW4 scores still null.
 
 ## Static assets (no CDN at runtime)
 - Team logos only: `static/assets/sport5/Files/...` (paths in DB like `/assets/sport5/...`)

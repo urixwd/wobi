@@ -54,13 +54,14 @@ WOBI הוא כלי עזר ל**ליגת החלומות (Dream Team / Sport5)**: �
 | staged | טיוטה ב־URL/טאב, לא DB |
 
 ## זרימת עדכון מחזור (חוזרת)
-1. Uri מביא dump **JSON מ־Sport5** (לא לשים בגיט; למשל `./incoming/players-gw5.json`).
-2. `bun run db:import-players -- --gw=5 ./incoming/players-gw5.json`  
-   → מעדכן `players` (חי) + `player_snapshots` למחזור 5 + `player_round_stats`.
-3. (אופציונלי) `bun run db:export-players -- --gw=5` — לבנות JSON בחזרה מ־`player_snapshots` אם צריך.
-4. `bun run db:dump` → מרענן `db/dumps/latest.sql` (גיבוי Postgres לגיט).
-5. לבדוק `/squad`, לעדכן הרכב, לשמור **הרכב סופי** ב־`/gameweek?gw=5` בדדליין.
-6. שני commits נפרדים כשצריך: **קוד**, ואז **דאטהבייס** (`db/dumps/latest.sql`).
+ההוראות המלאות — כולל תוצאות המחזור שהסתיים, לא רק dump שחקנים — ב־[docs/NEW-GAMEWEEK.md](NEW-GAMEWEEK.md).
+
+בקצרה, שני דברים נפרדים:
+
+1. dump שחקנים (לא בגיט) → `bun run db:import-players -- --gw=P ./incoming/....json`
+2. תוצאות המחזור שהסתיים → לעדכן ציונים ב־`fixtures.json` (הלוח המלא, כן בגיט) ואז `bun run db:import-fixtures`
+
+אחר כך `bun run db:dump` ושני commits: קבצים, ואז `db/dumps/latest.sql`.
 
 ## עדיין חלקי
 מומנטום מ־GW7 · שילוב watchlist באפשרויות · סריקת Dream Team חיה
