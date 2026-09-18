@@ -53,6 +53,7 @@ export type TransferResult = {
 	wishlistCount: number;
 	inboundCount: number;
 	forcedOut: number[];
+	forcedIn: number[];
 	maxTransfers: number;
 	feasible: boolean;
 	notes: string[];
@@ -198,19 +199,23 @@ export function buildTransfers(
 	squad: TPlayer[],
 	wishlist: TPlayer[],
 	forcedOutIds: Set<number>,
+	forcedInIds: Set<number> = new Set(),
 	maxTransfers = 3,
 	topN = 5
 ): TransferResult {
 	squadById = new Map(squad.map((p) => [p.id, p]));
 	const squadIds = new Set(squad.map((p) => p.id));
 	const inboundAll = wishlist.filter((p) => !squadIds.has(p.id));
+	const inboundIds = new Set(inboundAll.map((p) => p.id));
 	const forced = [...forcedOutIds].filter((id) => squadIds.has(id)).slice(0, maxTransfers);
+	const forcedIn = [...forcedInIds].filter((id) => inboundIds.has(id)).slice(0, maxTransfers);
 
 	const base: Omit<TransferResult, 'feasible' | 'notes' | 'best' | 'topPoints'> = {
 		hasSquad: squad.length === 15 && canCover(squad),
 		wishlistCount: wishlist.length,
 		inboundCount: inboundAll.length,
 		forcedOut: forced,
+		forcedIn,
 		maxTransfers,
 		capped: false
 	};
@@ -228,18 +233,27 @@ export function buildTransfers(
 			feasible: false,
 			notes: [`בחרת ${forced.length} להוצאה אבל יש רק ${inboundAll.length} מועמדים ברשימת המחזור.`]
 		};
+	if (forcedIn.length > maxTransfers)
+		return {
+			...base,
+			...empty,
+			feasible: false,
+			notes: [`אפשר עד ${maxTransfers} חילופים, אז לכל היותר ${maxTransfers} שחקנים שחייבים להיכנס.`]
+		};
 
-	// Cap inbound per position (top by points) to bound the search.
+	// Cap inbound per position (top by points) to bound the search; keep mandatory-in aside.
+	const forcedInPlayers = inboundAll.filter((p) => forcedInIds.has(p.id));
 	const inboundByPos: Record<number, TPlayer[]> = { 1: [], 2: [], 3: [], 4: [] };
-	for (const p of inboundAll) inboundByPos[p.position]?.push(p);
+	for (const p of inboundAll) if (!forcedInIds.has(p.id)) inboundByPos[p.position]?.push(p);
 	for (const pos of [1, 2, 3, 4])
 		inboundByPos[pos].sort((a, b) => b.points - a.points || a.price - b.price);
-	const inbound = [1, 2, 3, 4].flatMap((pos) => inboundByPos[pos].slice(0, PER_POS_CAP));
+	// Candidates for the non-mandatory incoming slots.
+	const restPool = [1, 2, 3, 4].flatMap((pos) => inboundByPos[pos].slice(0, PER_POS_CAP));
 
 	const optionalOuts = squad.filter((p) => !forcedOutIds.has(p.id));
 	const forcedPlayers = forced.map((id) => squadById.get(id)!).filter(Boolean);
 
-	const kMin = Math.max(1, forced.length);
+	const kMin = Math.max(1, forced.length, forcedIn.length);
 	let plans = 0;
 	let capped = false;
 
@@ -248,7 +262,8 @@ export function buildTransfers(
 
 	outer: for (let k = kMin; k <= maxTransfers; k++) {
 		const extraOuts = kcombos(optionalOuts, k - forced.length);
-		const inSets = kcombos(inbound, k);
+		// Every incoming set includes the mandatory players, then fills the rest.
+		const inSets = kcombos(restPool, k - forcedIn.length).map((rest) => [...forcedInPlayers, ...rest]);
 		for (const eo of extraOuts) {
 			const outSet = [...forcedPlayers, ...eo];
 			const removeIds = new Set(outSet.map((p) => p.id));

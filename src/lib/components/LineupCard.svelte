@@ -51,6 +51,7 @@
 	const byPos = (pos: number) => xi.filter((p) => p.position === pos);
 	const xiIds = $derived(xi.map((p) => p.id).join(','));
 	const benchIds = $derived(bench.map((p) => p.id).join(','));
+	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
 </script>
 
 <article class="flex flex-col gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-lg">
@@ -101,6 +102,25 @@
 			{/if}
 		{/each}
 	</div>
+
+	{#if bench.length}
+		<div>
+			<div class="mb-1 text-xs text-slate-500">ספסל</div>
+			<div class="flex flex-wrap gap-2">
+				{#each bench as p (p.id)}
+					<CompactPlayerCard
+						variant="bench"
+						name={p.name}
+						price={p.price}
+						points={p.points}
+						logo={p.logo}
+						teamName={p.teamName}
+						positionLabel={posLabel[p.position]}
+					/>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	{#if out.length || inn.length}
 		<div class="grid gap-3 rounded-xl border border-slate-700/80 bg-slate-950/50 p-3 sm:grid-cols-2">

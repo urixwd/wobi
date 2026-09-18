@@ -20,8 +20,18 @@
 
 	const transfers = $derived(data.transfers);
 	const outSet = $derived(new Set(data.forcedOut));
+	const inSet = $derived(new Set(data.forcedIn));
 	const MAX_OUT = 3;
+	const MAX_IN = 3;
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
+
+	function navTo(outIds: Set<number>, inIds: Set<number>) {
+		const params = new URLSearchParams();
+		if (outIds.size) params.set('out', [...outIds].join(','));
+		if (inIds.size) params.set('in', [...inIds].join(','));
+		const qs = params.toString();
+		goto(`/watchlist${qs ? `?${qs}` : ''}`, { invalidateAll: true, noScroll: true, keepFocus: true });
+	}
 
 	function toggleOut(id: number) {
 		const cur = new Set(data.forcedOut);
@@ -30,12 +40,25 @@
 			if (cur.size >= MAX_OUT) return;
 			cur.add(id);
 		}
-		const qs = cur.size ? `?out=${[...cur].join(',')}` : '';
-		goto(`/watchlist${qs}`, { invalidateAll: true, noScroll: true, keepFocus: true });
+		navTo(cur, new Set(data.forcedIn));
+	}
+
+	function toggleIn(id: number) {
+		const cur = new Set(data.forcedIn);
+		if (cur.has(id)) cur.delete(id);
+		else {
+			if (cur.size >= MAX_IN) return;
+			cur.add(id);
+		}
+		navTo(new Set(data.forcedOut), cur);
 	}
 
 	function clearOut() {
-		goto('/watchlist', { invalidateAll: true, noScroll: true, keepFocus: true });
+		navTo(new Set(), new Set(data.forcedIn));
+	}
+
+	function clearIn() {
+		navTo(new Set(data.forcedOut), new Set());
 	}
 
 	function comboStats(c: TransferCombo) {
@@ -266,6 +289,45 @@
 						</button>
 					{/each}
 				</div>
+			</div>
+
+			<!-- Must-come-in picker -->
+			<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
+				<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+					<h3 class="text-sm font-semibold text-slate-300">
+						בחר עד 3 שחייבים להיכנס <span class="text-slate-500">({inSet.size}/{MAX_IN})</span>
+					</h3>
+					{#if inSet.size}
+						<button type="button" class="text-xs text-slate-400 hover:text-white" onclick={clearIn}
+							>נקה בחירה</button
+						>
+					{/if}
+				</div>
+				<p class="mb-2 text-xs text-slate-500">
+					מרשימת המחזור. כל הצעה תכלול את מי שתסמן; היתר יימצא אוטומטית.
+				</p>
+				{#if data.inboundForPicker.length}
+					<div class="flex flex-wrap gap-1.5">
+						{#each data.inboundForPicker as p (p.id)}
+							{@const on = inSet.has(p.id)}
+							<button
+								type="button"
+								onclick={() => toggleIn(p.id)}
+								disabled={!on && inSet.size >= MAX_IN}
+								class="rounded-lg border px-2 py-1 text-xs transition
+									{on
+									? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200'
+									: 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-500 disabled:opacity-40'}"
+								title="{posLabel[p.position]} · {p.price}m · {p.points} נק׳"
+							>
+								{on ? '✓ ' : ''}{p.name}
+								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+							</button>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-xs text-slate-500">הוסף שחקנים לרשימת המחזור כדי לבחור מי חייב להיכנס.</p>
+				{/if}
 			</div>
 		{/if}
 

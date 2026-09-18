@@ -94,8 +94,17 @@ export const load: PageServerLoad = async ({ url }) => {
 	);
 
 	const { base, wishlist } = await buildTransferInputs(currentGw, baseIds);
-	// Marked players are mandatory outs; still consider extra transfers (up to 3 total).
-	const transfers = buildTransfers(base, wishlist, new Set(forcedOut), 3);
+
+	// Players that MUST come in — chosen from the wishlist (excluding ones already owned).
+	const baseIdSet = new Set(baseIds);
+	const inboundForPicker = wishlist
+		.filter((p) => !baseIdSet.has(p.id))
+		.sort((a, b) => a.position - b.position || b.points - a.points);
+	const inboundIds = new Set(inboundForPicker.map((p) => p.id));
+	const forcedIn = parseIdList(url.searchParams.get('in')).filter((id) => inboundIds.has(id));
+
+	// Marked outs are mandatory; marked ins are mandatory; still consider up to 3 total.
+	const transfers = buildTransfers(base, wishlist, new Set(forcedOut), new Set(forcedIn), 3);
 
 	const squadForPicker = [...base].sort((a, b) => a.position - b.position || b.points - a.points);
 
@@ -107,7 +116,9 @@ export const load: PageServerLoad = async ({ url }) => {
 		round: attachUpcoming(roundRaw, upcomingByTeam),
 		allPlayers: attachUpcoming(allPlayersRaw, upcomingByTeam),
 		squadForPicker,
+		inboundForPicker,
 		forcedOut,
+		forcedIn,
 		transfers
 	};
 };

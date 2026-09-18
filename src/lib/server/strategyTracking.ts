@@ -204,7 +204,7 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	}
 
 	// Released players are mandatory outs; strategies may also make extra transfers (up to 3).
-	const res = buildTransfers(base, wishlist, new Set(released), 3);
+	const res = buildTransfers(base, wishlist, new Set(released), new Set(), 3);
 	for (const b of res.best) {
 		if (!b.combo) continue;
 		await upsertPick({
