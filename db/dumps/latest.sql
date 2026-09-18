@@ -1,5 +1,5 @@
 -- WOBI Postgres dump
--- generated: 2026-09-18T11:18:55.871Z
+-- generated: 2026-09-18T11:31:42.566Z
 -- source: DATABASE_URL (credentials redacted)
 -- restore: psql "$DATABASE_URL" -f db/dumps/latest.sql
 
@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ld82YE5omnJLnk0X5fxi09foJBnUnapIGlQZGJuXhhsJHdPMFjAFCunwwTorNuJ
+\restrict dxccYK93R5I53LC4JuWygJ9kDVcQG55ybjJxJpTcod7YDzLii1gYTGDGDecDgqZ
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -38,6 +38,7 @@ DROP INDEX IF EXISTS public.watchlist_permanent_player_uidx;
 DROP INDEX IF EXISTS public.strategy_picks_gw_strategy_uidx;
 DROP INDEX IF EXISTS public.player_snapshots_gw_player_uidx;
 DROP INDEX IF EXISTS public.player_round_stats_player_s5_uidx;
+DROP INDEX IF EXISTS public.matchday_plan_gw_uidx;
 DROP INDEX IF EXISTS public.final_squads_gw_uidx;
 ALTER TABLE IF EXISTS ONLY public.watchlist_round DROP CONSTRAINT IF EXISTS watchlist_round_pkey;
 ALTER TABLE IF EXISTS ONLY public.watchlist_permanent DROP CONSTRAINT IF EXISTS watchlist_permanent_pkey;
@@ -48,6 +49,7 @@ ALTER TABLE IF EXISTS ONLY public.players DROP CONSTRAINT IF EXISTS players_pkey
 ALTER TABLE IF EXISTS ONLY public.player_snapshots DROP CONSTRAINT IF EXISTS player_snapshots_pkey;
 ALTER TABLE IF EXISTS ONLY public.player_round_stats DROP CONSTRAINT IF EXISTS player_round_stats_pkey;
 ALTER TABLE IF EXISTS ONLY public.my_squad DROP CONSTRAINT IF EXISTS my_squad_pkey;
+ALTER TABLE IF EXISTS ONLY public.matchday_plan DROP CONSTRAINT IF EXISTS matchday_plan_pkey;
 ALTER TABLE IF EXISTS ONLY public.gameweeks DROP CONSTRAINT IF EXISTS gameweeks_pkey;
 ALTER TABLE IF EXISTS ONLY public.gameweeks DROP CONSTRAINT IF EXISTS gameweeks_number_unique;
 ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_pkey;
@@ -59,6 +61,7 @@ ALTER TABLE IF EXISTS public.sketches ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_snapshots ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_round_stats ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.my_squad ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.matchday_plan ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.gameweeks ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.fixtures ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.final_squads ALTER COLUMN id DROP DEFAULT;
@@ -78,6 +81,8 @@ DROP SEQUENCE IF EXISTS public.player_round_stats_id_seq;
 DROP TABLE IF EXISTS public.player_round_stats;
 DROP SEQUENCE IF EXISTS public.my_squad_id_seq;
 DROP TABLE IF EXISTS public.my_squad;
+DROP SEQUENCE IF EXISTS public.matchday_plan_id_seq;
+DROP TABLE IF EXISTS public.matchday_plan;
 DROP SEQUENCE IF EXISTS public.gameweeks_id_seq;
 DROP TABLE IF EXISTS public.gameweeks;
 DROP SEQUENCE IF EXISTS public.fixtures_id_seq;
@@ -197,6 +202,38 @@ CREATE SEQUENCE public.gameweeks_id_seq
 --
 
 ALTER SEQUENCE public.gameweeks_id_seq OWNED BY public.gameweeks.id;
+
+
+--
+-- Name: matchday_plan; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.matchday_plan (
+    id integer NOT NULL,
+    gameweek_number integer NOT NULL,
+    must_in_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: matchday_plan_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.matchday_plan_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: matchday_plan_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.matchday_plan_id_seq OWNED BY public.matchday_plan.id;
 
 
 --
@@ -514,6 +551,13 @@ ALTER TABLE ONLY public.gameweeks ALTER COLUMN id SET DEFAULT nextval('public.ga
 
 
 --
+-- Name: matchday_plan id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.matchday_plan ALTER COLUMN id SET DEFAULT nextval('public.matchday_plan_id_seq'::regclass);
+
+
+--
 -- Name: my_squad id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -792,6 +836,14 @@ COPY public.gameweeks (id, number, label, is_current, starts_at, ends_at) FROM s
 27	25	מחזור 25	f	\N	\N
 28	26	מחזור 26	f	\N	\N
 2	5	מחזור 5	t	\N	\N
+\.
+
+
+--
+-- Data for Name: matchday_plan; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at) FROM stdin;
 \.
 
 
@@ -2778,6 +2830,13 @@ SELECT pg_catalog.setval('public.gameweeks_id_seq', 54, true);
 
 
 --
+-- Name: matchday_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.matchday_plan_id_seq', 2, true);
+
+
+--
 -- Name: my_squad_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
@@ -2859,6 +2918,14 @@ ALTER TABLE ONLY public.gameweeks
 
 
 --
+-- Name: matchday_plan matchday_plan_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.matchday_plan
+    ADD CONSTRAINT matchday_plan_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: my_squad my_squad_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2935,6 +3002,13 @@ ALTER TABLE ONLY public.watchlist_round
 --
 
 CREATE UNIQUE INDEX final_squads_gw_uidx ON public.final_squads USING btree (gameweek_number);
+
+
+--
+-- Name: matchday_plan_gw_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX matchday_plan_gw_uidx ON public.matchday_plan USING btree (gameweek_number);
 
 
 --
@@ -3048,5 +3122,5 @@ ALTER TABLE ONLY public.watchlist_round
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ld82YE5omnJLnk0X5fxi09foJBnUnapIGlQZGJuXhhsJHdPMFjAFCunwwTorNuJ
+\unrestrict dxccYK93R5I53LC4JuWygJ9kDVcQG55ybjJxJpTcod7YDzLii1gYTGDGDecDgqZ
 
