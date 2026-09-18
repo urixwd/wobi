@@ -1,5 +1,5 @@
 -- WOBI Postgres dump
--- generated: 2026-09-18T11:31:42.566Z
+-- generated: 2026-09-18T11:36:55.736Z
 -- source: DATABASE_URL (credentials redacted)
 -- restore: psql "$DATABASE_URL" -f db/dumps/latest.sql
 
@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dxccYK93R5I53LC4JuWygJ9kDVcQG55ybjJxJpTcod7YDzLii1gYTGDGDecDgqZ
+\restrict fx4iMvj8FMNaqRrfqD6hx6T48DBwxoIUcIPiy0oZBeTNpEjsafdQdoQWbEuXHyy
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -212,7 +212,8 @@ CREATE TABLE public.matchday_plan (
     id integer NOT NULL,
     gameweek_number integer NOT NULL,
     must_in_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    must_out_ids jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -843,7 +844,8 @@ COPY public.gameweeks (id, number, label, is_current, starts_at, ends_at) FROM s
 -- Data for Name: matchday_plan; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at) FROM stdin;
+COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at, must_out_ids) FROM stdin;
+7	5	[3474, 7257]	2026-09-18 13:36:39.344483+02	[]
 \.
 
 
@@ -2833,7 +2835,7 @@ SELECT pg_catalog.setval('public.gameweeks_id_seq', 54, true);
 -- Name: matchday_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.matchday_plan_id_seq', 2, true);
+SELECT pg_catalog.setval('public.matchday_plan_id_seq', 7, true);
 
 
 --
@@ -3122,5 +3124,5 @@ ALTER TABLE ONLY public.watchlist_round
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dxccYK93R5I53LC4JuWygJ9kDVcQG55ybjJxJpTcod7YDzLii1gYTGDGDecDgqZ
+\unrestrict fx4iMvj8FMNaqRrfqD6hx6T48DBwxoIUcIPiy0oZBeTNpEjsafdQdoQWbEuXHyy
 
