@@ -1,14 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { asc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import {
-	finalSquads,
-	players,
-	sketches,
-	teams,
-	watchlistPermanent,
-	watchlistRound
-} from '$lib/server/db/schema';
+import { players, sketches, teams, watchlistPermanent, watchlistRound } from '$lib/server/db/schema';
 import {
 	attachUpcoming,
 	getUpcomingFixturesByTeamIds,
@@ -17,10 +10,11 @@ import {
 import { buildTransfers } from '$lib/server/matchdayTransfers';
 import {
 	buildTransferInputs,
-	detectReleased,
 	getBaseSquad,
 	getMustIn,
-	setMustIn
+	getMustOut,
+	setMustIn,
+	setMustOut
 } from '$lib/server/strategyTracking';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -32,7 +26,7 @@ function parseIdList(raw: string | null): number[] {
 		.filter((n) => Number.isFinite(n) && n > 0);
 }
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async () => {
 	const currentGw = await resolveCurrentGwNumber(4);
 
 	const permanentRaw = await db
@@ -87,30 +81,20 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	// Transfer base = previous matchday's team (else the live squad).
 	const { ids: baseIds, fromGw } = await getBaseSquad(currentGw);
-	const savedThis = (
-		await db.select().from(finalSquads).where(eq(finalSquads.gameweekNumber, currentGw)).limit(1)
-	)[0];
-	const savedThisIds = savedThis ? [...savedThis.xiPlayerIds, ...savedThis.benchPlayerIds] : [];
-	// Auto-marked releases: what you dropped vs. the previous matchday (once saved).
-	const autoReleased = savedThis && fromGw != null ? detectReleased(baseIds, savedThisIds) : [];
-
-	const outParam = url.searchParams.get('out');
-	const forcedOut = (outParam != null ? parseIdList(outParam) : autoReleased).filter((id) =>
-		baseIds.includes(id)
-	);
-
 	const { base, wishlist } = await buildTransferInputs(currentGw, baseIds);
 
-	// Players that MUST come in — chosen from the wishlist (excluding ones already owned).
+	// Both pickers are persisted per matchday (sticky across reloads).
 	const baseIdSet = new Set(baseIds);
+	const forcedOut = (await getMustOut(currentGw)).filter((id) => baseIdSet.has(id));
+
+	// Players that MUST come in — chosen from the wishlist (excluding ones already owned).
 	const inboundForPicker = wishlist
 		.filter((p) => !baseIdSet.has(p.id))
 		.sort((a, b) => a.position - b.position || b.points - a.points);
 	const inboundIds = new Set(inboundForPicker.map((p) => p.id));
-	// Must-come-in is persisted per matchday (so the recorded what-if respects it).
 	const forcedIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
-	// Marked outs are mandatory; marked ins are mandatory; still consider up to 3 total.
+	// Marked outs and ins are mandatory; still consider up to 3 transfers total.
 	const transfers = buildTransfers(base, wishlist, new Set(forcedOut), new Set(forcedIn), 3);
 
 	const squadForPicker = [...base].sort((a, b) => a.position - b.position || b.points - a.points);
@@ -118,7 +102,6 @@ export const load: PageServerLoad = async ({ url }) => {
 	return {
 		currentGw,
 		baseFromGw: fromGw,
-		autoReleased,
 		permanent: attachUpcoming(permanentRaw, upcomingByTeam),
 		round: attachUpcoming(roundRaw, upcomingByTeam),
 		allPlayers: attachUpcoming(allPlayersRaw, upcomingByTeam),
@@ -184,6 +167,26 @@ export const actions: Actions = {
 	clearMustIn: async () => {
 		const currentGw = await resolveCurrentGwNumber(4);
 		await setMustIn(currentGw, []);
+		return { success: true };
+	},
+	/** Toggle a squad player as a mandatory release for the current matchday (max 3). */
+	toggleMustOut: async ({ request }) => {
+		const form = await request.formData();
+		const playerId = Number(form.get('playerId'));
+		if (!playerId) return fail(400, { message: 'חסר שחקן' });
+		const currentGw = await resolveCurrentGwNumber(4);
+		const cur = new Set(await getMustOut(currentGw));
+		if (cur.has(playerId)) cur.delete(playerId);
+		else {
+			if (cur.size >= 3) return fail(400, { message: 'עד 3 לשחרר' });
+			cur.add(playerId);
+		}
+		await setMustOut(currentGw, [...cur]);
+		return { success: true };
+	},
+	clearMustOut: async () => {
+		const currentGw = await resolveCurrentGwNumber(4);
+		await setMustOut(currentGw, []);
 		return { success: true };
 	},
 	/** Save a suggested combo as a sketch (same as /squad). */

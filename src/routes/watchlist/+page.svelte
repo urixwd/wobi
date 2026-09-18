@@ -2,7 +2,6 @@
 	import PlayerRow from '$lib/components/PlayerRow.svelte';
 	import LineupCard from '$lib/components/LineupCard.svelte';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import type { TransferCombo } from '$lib/server/matchdayTransfers';
 
 	let { data, form } = $props();
@@ -25,21 +24,7 @@
 	const MAX_IN = 3;
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
 
-	// Must-go-out is live URL state (?out); must-come-in is persisted server-side (forms below).
-	function toggleOut(id: number) {
-		const cur = new Set(data.forcedOut);
-		if (cur.has(id)) cur.delete(id);
-		else {
-			if (cur.size >= MAX_OUT) return;
-			cur.add(id);
-		}
-		const qs = cur.size ? `?out=${[...cur].join(',')}` : '';
-		goto(`/watchlist${qs}`, { invalidateAll: true, noScroll: true, keepFocus: true });
-	}
-
-	function clearOut() {
-		goto('/watchlist', { invalidateAll: true, noScroll: true, keepFocus: true });
-	}
+	// Both pickers persist server-side per matchday (forms below).
 
 	function comboStats(c: TransferCombo) {
 		return [
@@ -243,30 +228,32 @@
 						בחר עד 3 לשחרר מהקבוצה <span class="text-slate-500">({outSet.size}/{MAX_OUT})</span>
 					</h3>
 					{#if outSet.size}
-						<button type="button" class="text-xs text-slate-400 hover:text-white" onclick={clearOut}
-							>נקה בחירה</button
-						>
+						<form method="POST" action="?/clearMustOut" use:enhance>
+							<button type="submit" class="text-xs text-slate-400 hover:text-white">נקה בחירה</button>
+						</form>
 					{/if}
 				</div>
 				<p class="mb-2 text-xs text-slate-500">
-					ההצעות יכריחו את מי שתבחר לצאת. בלי בחירה — ההצעות ימצאו את החילופים הכי משתלמים.
+					נשמר למחזור. ההצעות יכריחו את מי שתבחר לצאת; בלי בחירה — יימצאו החילופים הכי משתלמים.
 				</p>
 				<div class="flex flex-wrap gap-1.5">
 					{#each data.squadForPicker as p (p.id)}
 						{@const on = outSet.has(p.id)}
-						<button
-							type="button"
-							onclick={() => toggleOut(p.id)}
-							disabled={!on && outSet.size >= MAX_OUT}
-							class="rounded-lg border px-2 py-1 text-xs transition
-								{on
-								? 'border-red-500/60 bg-red-500/20 text-red-200'
-								: 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-500 disabled:opacity-40'}"
-							title="{posLabel[p.position]} · {p.price}m · {p.points} נק׳"
-						>
-							{on ? '✕ ' : ''}{p.name}
-							<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
-						</button>
+						<form method="POST" action="?/toggleMustOut" use:enhance>
+							<input type="hidden" name="playerId" value={p.id} />
+							<button
+								type="submit"
+								disabled={!on && outSet.size >= MAX_OUT}
+								class="rounded-lg border px-2 py-1 text-xs transition
+									{on
+									? 'border-red-500/60 bg-red-500/20 text-red-200'
+									: 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-500 disabled:opacity-40'}"
+								title="{posLabel[p.position]} · {p.price}m · {p.points} נק׳"
+							>
+								{on ? '✕ ' : ''}{p.name}
+								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+							</button>
+						</form>
 					{/each}
 				</div>
 			</div>

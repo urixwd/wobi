@@ -125,6 +125,24 @@ export async function setMustIn(gameweekNumber: number, ids: number[]): Promise<
 		});
 }
 
+/** Squad players the user marked to release this matchday (persisted, for live suggestions). */
+export async function getMustOut(gameweekNumber: number): Promise<number[]> {
+	const row = (
+		await db.select().from(matchdayPlan).where(eq(matchdayPlan.gameweekNumber, gameweekNumber)).limit(1)
+	)[0];
+	return row?.mustOutIds ?? [];
+}
+
+export async function setMustOut(gameweekNumber: number, ids: number[]): Promise<void> {
+	await db
+		.insert(matchdayPlan)
+		.values({ gameweekNumber, mustOutIds: ids })
+		.onConflictDoUpdate({
+			target: matchdayPlan.gameweekNumber,
+			set: { mustOutIds: ids, updatedAt: new Date() }
+		});
+}
+
 /** Build base + wishlist TPlayers for the transfer engine (shared by page + recorder). */
 export async function buildTransferInputs(currentGw: number, baseIds: number[]) {
 	const [baseRows, wlRows] = await Promise.all([fetchRows(baseIds), wishlistRows(currentGw)]);

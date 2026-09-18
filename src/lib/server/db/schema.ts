@@ -228,9 +228,10 @@ export const strategyPicks = pgTable(
 );
 
 /**
- * Per-matchday planning prefs. `mustInIds` = wishlist players the user insists
- * on bringing in this matchday; the recorded what-if forces them into all four
- * strategies (they differ only on the remaining slots).
+ * Per-matchday planning prefs, persisted so the watchlist pickers are sticky.
+ * `mustInIds` = wishlist players the user insists on bringing in (forced into
+ * all four recorded strategies). `mustOutIds` = squad players marked to release
+ * for the live suggestions.
  */
 export const matchdayPlan = pgTable(
 	'matchday_plan',
@@ -238,6 +239,7 @@ export const matchdayPlan = pgTable(
 		id: serial('id').primaryKey(),
 		gameweekNumber: integer('gameweek_number').notNull(),
 		mustInIds: jsonb('must_in_ids').$type<number[]>().notNull().default([]),
+		mustOutIds: jsonb('must_out_ids').$type<number[]>().notNull().default([]),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('matchday_plan_gw_uidx').on(t.gameweekNumber)]
