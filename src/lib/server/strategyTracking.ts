@@ -371,6 +371,7 @@ export type PendingCardPlayer = {
 	points: number;
 	position: number;
 	logo: string | null;
+	upcomingFixtures: UpcomingFixture[];
 };
 export type PendingPick = {
 	strategy: string;
@@ -404,6 +405,11 @@ export async function getPendingMatchday(): Promise<PendingMatchday> {
 				.leftJoin(teams, eq(players.teamId, teams.id))
 				.where(inArray(players.id, ids))
 		: [];
+	const upcoming = await getUpcomingFixturesByTeamIds(
+		prows.map((r) => r.player.teamId),
+		gw,
+		5
+	);
 	const byId = new Map(
 		prows.map((r) => [
 			r.player.id,
@@ -413,7 +419,8 @@ export async function getPendingMatchday(): Promise<PendingMatchday> {
 				price: r.player.price,
 				points: seasonPoints(r.player) ?? 0,
 				position: r.player.position,
-				logo: r.logo ?? r.player.teamLogoPath
+				logo: r.logo ?? r.player.teamLogoPath,
+				upcomingFixtures: upcoming.get(r.player.teamId) ?? []
 			} satisfies PendingCardPlayer
 		])
 	);
