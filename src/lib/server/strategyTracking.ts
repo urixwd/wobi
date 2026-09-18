@@ -387,6 +387,7 @@ export type PendingPick = {
 	modeLabel: string | null;
 	formation: string | null;
 	spend: number | null;
+	points: number | null; // XI round points once scored
 	xi: PendingCardPlayer[];
 	bench: PendingCardPlayer[];
 };
@@ -397,8 +398,9 @@ export type PendingConstraints = {
 	forcedOut: number[];
 	forcedIn: number[];
 };
-export type PendingMatchday = {
+export type MatchdayDetail = {
 	gameweekNumber: number;
+	scored: boolean;
 	picks: PendingPick[];
 	constraints: PendingConstraints;
 } | null;
@@ -406,13 +408,17 @@ export type PendingMatchday = {
 const OBJ_ORDER = ['points', 'vlfm', 'fixtures', 'fixtures5', 'form'];
 const MODE_ORDER = ['constrained', 'out', 'free'];
 
-/** Latest recorded-but-not-yet-scored matchday, with hydrated line-ups for preview. */
-export async function getPendingMatchday(): Promise<PendingMatchday> {
-	const rows = await db.select().from(strategyPicks);
-	const unscored = rows.filter((r) => r.points == null);
-	if (!unscored.length) return null;
-	const gw = Math.max(...unscored.map((r) => r.gameweekNumber));
-	const picks = rows.filter((r) => r.gameweekNumber === gw);
+/** Gameweeks that have any recorded strategy picks, ascending. */
+export async function getRecordedGameweeks(): Promise<number[]> {
+	const rows = await db.select({ gw: strategyPicks.gameweekNumber }).from(strategyPicks);
+	return [...new Set(rows.map((r) => r.gw))].sort((a, b) => a - b);
+}
+
+/** One matchday's recorded line-ups + constraints, hydrated for display. */
+export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
+	const picks = await db.select().from(strategyPicks).where(eq(strategyPicks.gameweekNumber, gw));
+	if (!picks.length) return null;
+	const scored = picks.some((r) => r.points != null);
 
 	const ids = [...new Set(picks.flatMap((p) => [...p.xiPlayerIds, ...p.benchPlayerIds]))];
 	const prows = ids.length
@@ -453,6 +459,7 @@ export async function getPendingMatchday(): Promise<PendingMatchday> {
 			modeLabel: mode ? MODE_LABELS[mode] ?? mode : null,
 			formation: p.formation,
 			spend: p.spend,
+			points: p.points,
 			xi: hydrate(p.xiPlayerIds),
 			bench: hydrate(p.benchPlayerIds)
 		};
@@ -485,5 +492,5 @@ export async function getPendingMatchday(): Promise<PendingMatchday> {
 		forcedIn: (finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id))
 	};
 
-	return { gameweekNumber: gw, picks: list, constraints };
+	return { gameweekNumber: gw, scored, picks: list, constraints };
 }

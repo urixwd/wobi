@@ -1,9 +1,18 @@
-import { getStandings, getPendingMatchday } from '$lib/server/strategyTracking';
+import { getStandings, getMatchdayDetail, getRecordedGameweeks } from '$lib/server/strategyTracking';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
+	const gameweeks = await getRecordedGameweeks();
+	const requested = Number(url.searchParams.get('gw'));
+	const selectedGw =
+		Number.isFinite(requested) && gameweeks.includes(requested)
+			? requested
+			: (gameweeks.at(-1) ?? null);
+
 	return {
 		standings: await getStandings(),
-		pending: await getPendingMatchday()
+		gameweeksAvailable: gameweeks,
+		selectedGw,
+		detail: selectedGw != null ? await getMatchdayDetail(selectedGw) : null
 	};
 };

@@ -4,8 +4,14 @@
 
 	let { data }: { data: PageData } = $props();
 	const st = $derived(data.standings);
-	const pending = $derived(data.pending);
+	const detail = $derived(data.detail);
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
+
+	// Matchday navigation (prev/next across recorded gameweeks).
+	const gwList = $derived(data.gameweeksAvailable ?? []);
+	const gwIdx = $derived(data.selectedGw != null ? gwList.indexOf(data.selectedGw) : -1);
+	const prevGw = $derived(gwIdx > 0 ? gwList[gwIdx - 1] : null);
+	const nextGw = $derived(gwIdx >= 0 && gwIdx < gwList.length - 1 ? gwList[gwIdx + 1] : null);
 
 	/** Color by objective; mode is shown via line style / a badge. */
 	const COLORS: Record<string, string> = {
@@ -74,16 +80,35 @@
 		</p>
 	</div>
 
-	{#if pending}
-		{@const c = pending.constraints}
+	{#if detail}
+		{@const c = detail.constraints}
 		{@const outIds = new Set(c.forcedOut)}
 		{@const inIds = new Set(c.forcedIn)}
 		<div class="space-y-3">
-			<div>
-				<h2 class="text-lg font-bold">מחזור {pending.gameweekNumber} — טרם דורג</h2>
-				<p class="text-sm text-slate-400">
-					האילוצים וההרכבים שנרשמו לכל שיטה. הניקוד יתווסף אחרי שהתוצאות ייכנסו.
-				</p>
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<div>
+					<h2 class="text-lg font-bold">
+						מחזור {detail.gameweekNumber}
+						{#if detail.scored}
+							<span class="text-sm font-normal text-emerald-300">· דורג</span>
+						{:else}
+							<span class="text-sm font-normal text-slate-500">· טרם דורג</span>
+						{/if}
+					</h2>
+					<p class="text-sm text-slate-400">האילוצים וההרכבים שנרשמו לכל שיטה.</p>
+				</div>
+				<div class="flex items-center gap-1">
+					{#if prevGw != null}
+						<a href="?gw={prevGw}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200">→ מחזור {prevGw}</a>
+					{:else}
+						<span class="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-slate-600">→</span>
+					{/if}
+					{#if nextGw != null}
+						<a href="?gw={nextGw}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-200">מחזור {nextGw} ←</a>
+					{:else}
+						<span class="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-slate-600">←</span>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Read-only constraint log (same lists as /watchlist) -->
@@ -129,10 +154,10 @@
 			</div>
 
 			<div class="grid gap-5 lg:grid-cols-3">
-				{#each pending.picks as p (p.strategy)}
+				{#each detail.picks as p (p.strategy)}
 					<LineupCard
 						title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
-						badge="טרם דורג"
+						badge={p.points != null ? `${p.points} נק׳` : 'טרם דורג'}
 						formation={p.formation ?? '—'}
 						stats={[{ label: 'הוצאה', value: `${p.spend ?? '—'} / 120`, tone: 'text-white' }]}
 						xi={p.xi}
