@@ -49,6 +49,18 @@ bun run db:import-fixtures
 ```
 **Warning:** this deletes **every** `fixtures` row and reimports from `fixtures.json`. Never point it at a partial file — a missing match is deleted from the DB.
 
+## Job 3 — settle the what-if strategy tracking (from GW5 on)
+
+Round F's points arrive with the dump you just imported (`player_snapshots[F+1]`), so score the finished round's recorded what-if picks **after** Job 1:
+
+```bash
+bun run db:score-strategies            # scores round (is_current - 1)
+# or explicitly:
+bun run db:score-strategies -- --round=<F>
+```
+
+This fills `strategy_picks.points` for round F (the 4 strategies + your actual team). Nothing to do if the round is < 5 or its dump isn't in yet — the script says so. Results show at `/strategies`. Recording of each matchday's what-if happens automatically when you press **שמור קבוצה** on `/squad`; this step only scores them once results exist.
+
 ## Verify
 
 ```bash

@@ -53,15 +53,16 @@ bun run dev
 | `bun run db:export-players -- --gw=N` | בניית JSON דמוי-Sport5 מ־`player_snapshots` |
 | `bun run db:dump` | `pg_dump` → `db/dumps/latest.sql` (+ עותק מתוארך ב־gitignore) |
 | `bun run db:import-fixtures` | ייבוא מ־`./fixtures.json` |
+| `bun run db:score-strategies -- --round=N` | דירוג ה־«מה היה קורה» של מחזור N (מ־GW5) → `strategy_picks.points` |
 | `bun run db:studio` | Drizzle Studio |
 
 ## עמודים
 
 1. **הקבוצה שלי** (`/squad`) — ברירת מחדל; XI + ספסל, פילטרים, staged  
 2. **סקיצות** — טיוטות לפי מחזור  
-3. **מחזור** — לוח משחקים + הרכב סופי  
-4. **אפשרויות קבוצה** — עד 3 חילופים מהשמור  
-5. **מעקב / הצעות חילופים** — קיימים; בתפריט נראים כבויים  
+3. **אפשרויות קבוצה** (`/options`) — עד 3 חילופים מהשמור  
+4. **מעקב** (`/watchlist`) — רשימה קבועה + רשימת מחזור, והצעות חילופים למחזור  
+5. **אסטרטגיות** (`/strategies`) — מעקב «מה היה קורה» לפי 4 השיטות מול הבחירות שלך (מ־GW5)  
 
 ## קושי יריבות
 

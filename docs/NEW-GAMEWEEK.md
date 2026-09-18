@@ -60,7 +60,7 @@ bun run db:import-fixtures
 
 **אזהרה:** הסקריפט מוחק את **כל** שורות `fixtures` ומייבא מחדש מ־`fixtures.json`. אסור להחליף את הקובץ ברשימה חלקית של מחזור אחד. אם חסר משחק בקובץ — הוא יימחק מה־DB.
 
-התוצאה מופיעה ב־`/squad` וב־`/gameweek` באמצע בין הסמלים (למשל `2:1`) במקום המילה «נגד».
+התוצאה מופיעה ב־`/squad` באמצע בין הסמלים (למשל `2:1`) במקום המילה «נגד».
 
 מזהי קבוצות (homeTeamId / awayTeamId) הם ה־id של Sport5 שכבר בטבלת `teams`. לא להמציא id.
 
@@ -74,7 +74,16 @@ psql "$DATABASE_URL" -c "SELECT g.number, count(f.id) AS games, count(f.home_sco
 psql "$DATABASE_URL" -c "SELECT number, is_current FROM gameweeks WHERE is_current OR number IN (F);"
 ```
 
-ואז `bun run dev` ולוודא ב־`/gameweek` שהתוצאות של F מופיעות, וב־`/squad` שהשחקנים והלוגו תקינים.
+אחרי ייבוא ה־dump, לדרג את ה־«מה היה קורה» של המחזור שהסתיים (מ־מחזור 5 והלאה):
+
+```bash
+bun run db:score-strategies            # מדרג את מחזור (is_current - 1)
+# או במפורש: bun run db:score-strategies -- --round=F
+```
+
+נקודות מחזור F נמצאות ב־`player_snapshots[F+1]` (ה־dump שהרגע יובא). התוצאות מופיעות ב־`/strategies`. הרישום של כל מחזור קורה אוטומטית בלחיצה על «שמור קבוצה» ב־`/squad`; השלב הזה רק מדרג לפי נקודות אמת.
+
+ואז `bun run dev` ולוודא ב־`/squad` שהתוצאות של F מופיעות ושהשחקנים והלוגו תקינים, וב־`/strategies` שהדירוג עודכן.
 
 ## 4. לשמור בגיט
 
