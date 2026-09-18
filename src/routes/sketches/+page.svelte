@@ -37,10 +37,10 @@
 					href="/sketches?gw={data.gw - 1}"
 					class="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
 				>
-					← מחזור קודם
+					→ מחזור קודם
 				</a>
 			{:else}
-				<span class="rounded-lg border border-slate-800 px-3 py-1.5 text-sm text-slate-600">← מחזור קודם</span>
+				<span class="rounded-lg border border-slate-800 px-3 py-1.5 text-sm text-slate-600">→ מחזור קודם</span>
 			{/if}
 			<span class="rounded-full bg-slate-800 px-3 py-1 text-sm font-medium text-emerald-300">
 				מחזור {data.gw}
@@ -53,10 +53,10 @@
 					href="/sketches?gw={data.gw + 1}"
 					class="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
 				>
-					מחזור הבא →
+					מחזור הבא ←
 				</a>
 			{:else}
-				<span class="rounded-lg border border-slate-800 px-3 py-1.5 text-sm text-slate-600">מחזור הבא →</span>
+				<span class="rounded-lg border border-slate-800 px-3 py-1.5 text-sm text-slate-600">מחזור הבא ←</span>
 			{/if}
 		</nav>
 	</header>

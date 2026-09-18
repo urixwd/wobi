@@ -1346,7 +1346,7 @@
 					disabled={viewGw <= data.minGw}
 					onclick={() => (viewGw = Math.max(data.minGw, viewGw - 1))}
 				>
-					← מחזור קודם
+					→ מחזור קודם
 				</button>
 				<span class="rounded-lg bg-emerald-500/15 px-3 py-1.5 font-semibold text-emerald-300">
 					מחזור {viewGw}
@@ -1360,7 +1360,7 @@
 					disabled={viewGw >= data.maxGw}
 					onclick={() => (viewGw = Math.min(data.maxGw, viewGw + 1))}
 				>
-					מחזור הבא →
+					מחזור הבא ←
 				</button>
 			</nav>
 		</div>
