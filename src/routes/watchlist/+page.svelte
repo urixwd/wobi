@@ -314,29 +314,41 @@
 				<p class="text-xs text-slate-500">הרשימה גדולה — מוצגות ההצעות הטובות ביותר מתוך חיפוש מוגבל.</p>
 			{/if}
 
-			<div>
-				<h3 class="mb-2 text-sm font-semibold text-slate-300">ההצעה הטובה ביותר לכל דירוג</h3>
-				<div class="grid gap-5 lg:grid-cols-2">
-					{#each transfers.best as b (b.key)}
-						{#if b.combo}
-							<LineupCard
-								title={b.title}
-								subtitle={objSubtitle[b.key]?.(b.combo) ?? null}
-								formation={b.combo.formation}
-								transfersUsed={b.combo.transfersUsed}
-								stats={comboStats(b.combo)}
-								xi={b.combo.xi}
-								bench={b.combo.bench}
-								out={b.combo.out}
-								inn={b.combo.in}
-								actions
-								sketchName={`${b.title} · מחזור ${data.currentGw}`}
-								gameweekNumber={data.currentGw}
-							/>
-						{/if}
-					{/each}
+			<p class="text-xs text-slate-500">
+				לכל דירוג שלוש גרסאות: <span class="text-slate-300">מוגבל</span> (מכבד יציאה+כניסה),
+				<span class="text-slate-300">יציאה בלבד</span>, ו<span class="text-slate-300">חופשי</span>.
+			</p>
+			{#each transfers.byObjective as o (o.key)}
+				<div>
+					<h3 class="mb-2 text-sm font-semibold text-slate-300">{o.title}</h3>
+					<div class="grid gap-5 lg:grid-cols-3">
+						{#each o.variants as v (v.mode)}
+							{#if v.combo}
+								<LineupCard
+									title={v.modeLabel}
+									subtitle={objSubtitle[o.key]?.(v.combo) ?? null}
+									formation={v.combo.formation}
+									transfersUsed={v.combo.transfersUsed}
+									stats={comboStats(v.combo)}
+									xi={v.combo.xi}
+									bench={v.combo.bench}
+									out={v.combo.out}
+									inn={v.combo.in}
+									actions
+									sketchName={`${o.title} · ${v.modeLabel} · מחזור ${data.currentGw}`}
+									gameweekNumber={data.currentGw}
+								/>
+							{:else}
+								<div
+									class="flex items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-900/40 p-4 text-center text-xs text-slate-500"
+								>
+									{v.modeLabel}: אין הרכב חוקי במצב הזה
+								</div>
+							{/if}
+						{/each}
+					</div>
 				</div>
-			</div>
+			{/each}
 
 			{#if transfers.topPoints.length}
 				<div>
