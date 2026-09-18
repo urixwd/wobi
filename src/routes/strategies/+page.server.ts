@@ -1,6 +1,9 @@
-import { getStandings } from '$lib/server/strategyTracking';
+import { getStandings, getPendingMatchday } from '$lib/server/strategyTracking';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
-	return { standings: await getStandings() };
+	return {
+		standings: await getStandings(),
+		pending: await getPendingMatchday()
+	};
 };

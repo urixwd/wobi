@@ -1,8 +1,10 @@
 <script lang="ts">
+	import LineupCard from '$lib/components/LineupCard.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const st = $derived(data.standings);
+	const pending = $derived(data.pending);
 
 	/** Color by objective; mode is shown via line style / a badge. */
 	const COLORS: Record<string, string> = {
@@ -70,6 +72,29 @@
 			בפועל. מ־מחזור 5, מדורג אחרי שהתוצאות נכנסות.
 		</p>
 	</div>
+
+	{#if pending}
+		<div class="space-y-3">
+			<div>
+				<h2 class="text-lg font-bold">מחזור {pending.gameweekNumber} — טרם דורג</h2>
+				<p class="text-sm text-slate-400">
+					ההרכבים שכבר נרשמו לכל שיטה. הניקוד יתווסף אחרי שהתוצאות ייכנסו.
+				</p>
+			</div>
+			<div class="grid gap-5 lg:grid-cols-3">
+				{#each pending.picks as p (p.strategy)}
+					<LineupCard
+						title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
+						badge="טרם דורג"
+						formation={p.formation ?? '—'}
+						stats={[{ label: 'הוצאה', value: `${p.spend ?? '—'} / 120`, tone: 'text-white' }]}
+						xi={p.xi}
+						bench={p.bench}
+					/>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	{#if !st.gameweeks.length}
 		<div class="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-6 text-center text-slate-400">

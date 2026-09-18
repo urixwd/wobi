@@ -254,10 +254,8 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	});
 	const recorded = ['actual'];
 
-	// No previous matchday → GW5 baseline: only the actual team is stored.
-	if (fromGw == null) return { recorded };
-
-	// Record each strategy under three constraint modes.
+	// Record each strategy under three constraint modes. (At the first tracked
+	// matchday there's no previous team, so the base is the current squad.)
 	const modeDefs = [
 		{ mode: 'constrained', out: new Set(mustOut), in: new Set(mustIn), rel: mustOut },
 		{ mode: 'out', out: new Set(mustOut), in: new Set<number>(), rel: mustOut },
@@ -364,4 +362,82 @@ export async function getStandings(): Promise<Standings> {
 	];
 
 	return { gameweeks, series: ordered, leader: gameweeks.length ? leader : null };
+}
+
+export type PendingCardPlayer = {
+	id: number;
+	name: string;
+	price: number;
+	points: number;
+	position: number;
+	logo: string | null;
+};
+export type PendingPick = {
+	strategy: string;
+	objective: string;
+	mode: string | null;
+	label: string;
+	modeLabel: string | null;
+	formation: string | null;
+	spend: number | null;
+	xi: PendingCardPlayer[];
+	bench: PendingCardPlayer[];
+};
+export type PendingMatchday = { gameweekNumber: number; picks: PendingPick[] } | null;
+
+const OBJ_ORDER = ['points', 'vlfm', 'fixtures', 'fixtures5', 'form'];
+const MODE_ORDER = ['constrained', 'out', 'free'];
+
+/** Latest recorded-but-not-yet-scored matchday, with hydrated line-ups for preview. */
+export async function getPendingMatchday(): Promise<PendingMatchday> {
+	const rows = await db.select().from(strategyPicks);
+	const unscored = rows.filter((r) => r.points == null);
+	if (!unscored.length) return null;
+	const gw = Math.max(...unscored.map((r) => r.gameweekNumber));
+	const picks = rows.filter((r) => r.gameweekNumber === gw);
+
+	const ids = [...new Set(picks.flatMap((p) => [...p.xiPlayerIds, ...p.benchPlayerIds]))];
+	const prows = ids.length
+		? await db
+				.select({ player: players, logo: teams.logoPath })
+				.from(players)
+				.leftJoin(teams, eq(players.teamId, teams.id))
+				.where(inArray(players.id, ids))
+		: [];
+	const byId = new Map(
+		prows.map((r) => [
+			r.player.id,
+			{
+				id: r.player.id,
+				name: r.player.name,
+				price: r.player.price,
+				points: seasonPoints(r.player) ?? 0,
+				position: r.player.position,
+				logo: r.logo ?? r.player.teamLogoPath
+			} satisfies PendingCardPlayer
+		])
+	);
+	const hydrate = (arr: number[]) => arr.map((id) => byId.get(id)).filter(Boolean) as PendingCardPlayer[];
+
+	const list: PendingPick[] = picks.map((p) => {
+		const { objective, mode } = parseStrategyKey(p.strategy);
+		return {
+			strategy: p.strategy,
+			objective,
+			mode,
+			label: STRATEGY_LABELS[objective] ?? objective,
+			modeLabel: mode ? MODE_LABELS[mode] ?? mode : null,
+			formation: p.formation,
+			spend: p.spend,
+			xi: hydrate(p.xiPlayerIds),
+			bench: hydrate(p.benchPlayerIds)
+		};
+	});
+	list.sort((a, b) => {
+		if (a.strategy === 'actual') return -1;
+		if (b.strategy === 'actual') return 1;
+		const o = OBJ_ORDER.indexOf(a.objective) - OBJ_ORDER.indexOf(b.objective);
+		return o !== 0 ? o : MODE_ORDER.indexOf(a.mode ?? '') - MODE_ORDER.indexOf(b.mode ?? '');
+	});
+	return { gameweekNumber: gw, picks: list };
 }
