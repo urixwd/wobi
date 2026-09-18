@@ -35,7 +35,8 @@ export const TRACKING_START_GW = 5;
 export const STRATEGY_LABELS: Record<string, string> = {
 	points: 'מקסימום נקודות',
 	vlfm: 'תמורה למחיר',
-	fixtures: 'לוח קל',
+	fixtures: 'לוח קל למחזור',
+	fixtures5: 'לוח קל (5 מחזורים)',
 	form: 'כושר',
 	actual: 'הבחירה שלי'
 };
@@ -60,11 +61,18 @@ export function parseStrategyKey(s: string): { objective: string; mode: string |
 	return i < 0 ? { objective: s, mode: null } : { objective: s.slice(0, i), mode: s.slice(i + 1) };
 }
 
+const EASE: Record<FixtureDifficulty, number> = { green: 3, yellow: 1, red: -2 };
+
 function matchdayEaseOf(upcoming: UpcomingFixture[], currentGw: number): number {
 	const f = upcoming.find((u) => u.gameweekNumber === currentGw) ?? upcoming[0];
-	if (!f) return 0;
-	const rank: Record<FixtureDifficulty, number> = { green: 3, yellow: 1, red: -2 };
-	return rank[f.difficulty] ?? 0;
+	return f ? EASE[f.difficulty] ?? 0 : 0;
+}
+
+/** Average ease over the next up-to-5 fixtures (matches /squad's "לוח (5)"). */
+function fixtureEase5Of(upcoming: UpcomingFixture[]): number {
+	const slice = upcoming.slice(0, 5);
+	if (!slice.length) return 0;
+	return slice.reduce((s, f) => s + (EASE[f.difficulty] ?? 0), 0) / slice.length;
 }
 
 type Row = { player: typeof players.$inferSelect; teamName: string | null; teamLogo: string | null };
@@ -81,6 +89,7 @@ function toTPlayer(r: Row, upcoming: UpcomingFixture[], currentGw: number): TPla
 		form: lastRoundPoints(r.player) ?? 0,
 		vlfm: vlfm(r.player) ?? 0,
 		matchdayEase: matchdayEaseOf(upcoming, currentGw),
+		fixtureEase5: fixtureEase5Of(upcoming),
 		upcomingFixtures: upcoming
 	};
 }

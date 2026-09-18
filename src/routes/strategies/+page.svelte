@@ -10,6 +10,7 @@
 		points: '#38bdf8',
 		vlfm: '#a78bfa',
 		fixtures: '#fbbf24',
+		fixtures5: '#2dd4bf',
 		form: '#fb7185'
 	};
 	const colorOf = (objective: string) => COLORS[objective] ?? '#94a3b8';

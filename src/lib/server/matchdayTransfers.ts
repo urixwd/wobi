@@ -25,10 +25,11 @@ export type TPlayer = {
 	form: number; // last-round points
 	vlfm: number; // points per million
 	matchdayEase: number; // this matchday fixture: green +3, yellow +1, red -2
+	fixtureEase5: number; // average ease over the next up-to-5 fixtures
 	upcomingFixtures: UpcomingFixture[];
 };
 
-export type ObjectiveKey = 'points' | 'vlfm' | 'fixtures' | 'form';
+export type ObjectiveKey = 'points' | 'vlfm' | 'fixtures' | 'fixtures5' | 'form';
 
 export type TransferCombo = {
 	id: string; // sorted squad ids
@@ -44,6 +45,7 @@ export type TransferCombo = {
 	form: number; // XI sum
 	vlfm: number; // XI average
 	matchdayEase: number; // XI average
+	fixtureEase5: number; // XI average
 };
 
 export type BestByObjective = { key: ObjectiveKey; title: string; combo: TransferCombo | null };
@@ -66,6 +68,7 @@ export const OBJECTIVES: { key: ObjectiveKey; title: string }[] = [
 	{ key: 'points', title: 'מקסימום נקודות' },
 	{ key: 'vlfm', title: 'תמורה למחיר' },
 	{ key: 'fixtures', title: 'לוח קל למחזור' },
+	{ key: 'fixtures5', title: 'לוח קל לחמשת המחזורים הקרובים' },
 	{ key: 'form', title: 'כושר (מחזור אחרון)' }
 ];
 
@@ -84,7 +87,17 @@ const SCORE: Record<ObjectiveKey, ScoreFn> = {
 	points: (p) => p.points,
 	vlfm: (p) => p.vlfm,
 	fixtures: (p) => p.matchdayEase,
+	fixtures5: (p) => p.fixtureEase5,
 	form: (p) => p.form
+};
+
+/** The XI metric each objective is judged on. */
+const COMBO_METRIC: Record<ObjectiveKey, (c: TransferCombo) => number> = {
+	points: (c) => c.points,
+	vlfm: (c) => c.vlfm,
+	fixtures: (c) => c.matchdayEase,
+	fixtures5: (c) => c.fixtureEase5,
+	form: (c) => c.form
 };
 
 function kcombos<T>(arr: T[], k: number): T[][] {
@@ -185,7 +198,8 @@ function makeCombo(newSquad: TPlayer[], squadIds: Set<number>, xi: TPlayer[], be
 		points: xi.reduce((s, p) => s + p.points, 0),
 		form: xi.reduce((s, p) => s + p.form, 0),
 		vlfm: xi.reduce((s, p) => s + p.vlfm, 0) / xi.length,
-		matchdayEase: xi.reduce((s, p) => s + p.matchdayEase, 0) / xi.length
+		matchdayEase: xi.reduce((s, p) => s + p.matchdayEase, 0) / xi.length,
+		fixtureEase5: xi.reduce((s, p) => s + p.fixtureEase5, 0) / xi.length
 	};
 }
 
@@ -291,14 +305,7 @@ export function buildTransfers(
 					const arr = arrange(newSquad, SCORE[key]);
 					if (!arr) continue;
 					const combo = makeCombo(newSquad, squadIds, arr.xi, arr.bench);
-					const sc =
-						key === 'points'
-							? combo.points
-							: key === 'form'
-								? combo.form
-								: key === 'vlfm'
-									? combo.vlfm
-									: combo.matchdayEase;
+					const sc = COMBO_METRIC[key](combo);
 					const cur = bestByObj.get(key);
 					if (!cur || sc > cur.sc + 1e-9 || (Math.abs(sc - cur.sc) <= 1e-9 && combo.points > cur.combo.points))
 						bestByObj.set(key, { combo, sc: Math.max(sc, cur?.sc ?? -Infinity) });

@@ -38,7 +38,8 @@
 	const objSubtitle: Record<string, (c: TransferCombo) => string> = {
 		points: (c) => `${c.points} נק׳ · מערך ${c.formation}`,
 		vlfm: (c) => `vlfm ממוצע ${c.vlfm.toFixed(2)} · פנוי ${c.remaining}`,
-		fixtures: (c) => `ממוצע קושי לוח ${c.matchdayEase.toFixed(2)} · ${c.formation}`,
+		fixtures: (c) => `קלות לוח מחזור ${c.matchdayEase.toFixed(2)} · ${c.formation}`,
+		fixtures5: (c) => `קלות לוח 5 מחזורים ${c.fixtureEase5.toFixed(2)} · ${c.formation}`,
 		form: (c) => `${c.form} נק׳ במחזור האחרון · ${c.formation}`
 	};
 </script>
