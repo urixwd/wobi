@@ -15,7 +15,13 @@ import {
 	resolveCurrentGwNumber
 } from '$lib/server/upcomingFixtures';
 import { buildTransfers } from '$lib/server/matchdayTransfers';
-import { buildTransferInputs, detectReleased, getBaseSquad } from '$lib/server/strategyTracking';
+import {
+	buildTransferInputs,
+	detectReleased,
+	getBaseSquad,
+	getMustIn,
+	setMustIn
+} from '$lib/server/strategyTracking';
 import type { Actions, PageServerLoad } from './$types';
 
 function parseIdList(raw: string | null): number[] {
@@ -101,7 +107,8 @@ export const load: PageServerLoad = async ({ url }) => {
 		.filter((p) => !baseIdSet.has(p.id))
 		.sort((a, b) => a.position - b.position || b.points - a.points);
 	const inboundIds = new Set(inboundForPicker.map((p) => p.id));
-	const forcedIn = parseIdList(url.searchParams.get('in')).filter((id) => inboundIds.has(id));
+	// Must-come-in is persisted per matchday (so the recorded what-if respects it).
+	const forcedIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
 	// Marked outs are mandatory; marked ins are mandatory; still consider up to 3 total.
 	const transfers = buildTransfers(base, wishlist, new Set(forcedOut), new Set(forcedIn), 3);
@@ -157,6 +164,26 @@ export const actions: Actions = {
 		const id = Number(form.get('id'));
 		if (!id) return fail(400);
 		await db.delete(watchlistRound).where(eq(watchlistRound.id, id));
+		return { success: true };
+	},
+	/** Toggle a wishlist player as a mandatory incomer for the current matchday (max 3). */
+	toggleMustIn: async ({ request }) => {
+		const form = await request.formData();
+		const playerId = Number(form.get('playerId'));
+		if (!playerId) return fail(400, { message: 'חסר שחקן' });
+		const currentGw = await resolveCurrentGwNumber(4);
+		const cur = new Set(await getMustIn(currentGw));
+		if (cur.has(playerId)) cur.delete(playerId);
+		else {
+			if (cur.size >= 3) return fail(400, { message: 'עד 3 שחייבים להיכנס' });
+			cur.add(playerId);
+		}
+		await setMustIn(currentGw, [...cur]);
+		return { success: true };
+	},
+	clearMustIn: async () => {
+		const currentGw = await resolveCurrentGwNumber(4);
+		await setMustIn(currentGw, []);
 		return { success: true };
 	},
 	/** Save a suggested combo as a sketch (same as /squad). */

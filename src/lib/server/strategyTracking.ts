@@ -12,6 +12,7 @@ import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import {
 	finalSquads,
+	matchdayPlan,
 	mySquad,
 	players,
 	playerSnapshots,
@@ -106,6 +107,24 @@ export function detectReleased(baseIds: number[], currentIds: number[]): number[
 	return baseIds.filter((id) => !cur.has(id));
 }
 
+/** Wishlist players the user insists on bringing in this matchday (persisted). */
+export async function getMustIn(gameweekNumber: number): Promise<number[]> {
+	const row = (
+		await db.select().from(matchdayPlan).where(eq(matchdayPlan.gameweekNumber, gameweekNumber)).limit(1)
+	)[0];
+	return row?.mustInIds ?? [];
+}
+
+export async function setMustIn(gameweekNumber: number, ids: number[]): Promise<void> {
+	await db
+		.insert(matchdayPlan)
+		.values({ gameweekNumber, mustInIds: ids })
+		.onConflictDoUpdate({
+			target: matchdayPlan.gameweekNumber,
+			set: { mustInIds: ids, updatedAt: new Date() }
+		});
+}
+
 /** Build base + wishlist TPlayers for the transfer engine (shared by page + recorder). */
 export async function buildTransferInputs(currentGw: number, baseIds: number[]) {
 	const [baseRows, wlRows] = await Promise.all([fetchRows(baseIds), wishlistRows(currentGw)]);
@@ -167,6 +186,8 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 
 	const { ids: baseIds, fromGw } = await getBaseSquad(currentGw);
 	const released = fromGw != null ? detectReleased(baseIds, currentIds) : [];
+	// Wishlist players the user locked as mandatory incomers (only those not already owned).
+	const mustIn = (await getMustIn(currentGw)).filter((id) => !baseIds.includes(id));
 
 	// Always record the actual team.
 	const { base, wishlist } = await buildTransferInputs(currentGw, baseIds);
@@ -186,8 +207,8 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	// No previous matchday → GW5 baseline: only the actual team is stored.
 	if (fromGw == null) return { recorded, released };
 
-	if (released.length === 0) {
-		// No transfers this matchday → every strategy equals your team.
+	if (released.length === 0 && mustIn.length === 0) {
+		// No transfers and nothing locked in → every strategy equals your team.
 		for (const { key } of OBJECTIVES) {
 			await upsertPick({
 				gameweekNumber: currentGw,
@@ -203,8 +224,8 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 		return { recorded, released };
 	}
 
-	// Released players are mandatory outs; strategies may also make extra transfers (up to 3).
-	const res = buildTransfers(base, wishlist, new Set(released), new Set(), 3);
+	// Released = mandatory outs, mustIn = mandatory incomers; up to 3 transfers total.
+	const res = buildTransfers(base, wishlist, new Set(released), new Set(mustIn), 3);
 	for (const b of res.best) {
 		if (!b.combo) continue;
 		await upsertPick({

@@ -227,9 +227,26 @@ export const strategyPicks = pgTable(
 	(t) => [uniqueIndex('strategy_picks_gw_strategy_uidx').on(t.gameweekNumber, t.strategy)]
 );
 
+/**
+ * Per-matchday planning prefs. `mustInIds` = wishlist players the user insists
+ * on bringing in this matchday; the recorded what-if forces them into all four
+ * strategies (they differ only on the remaining slots).
+ */
+export const matchdayPlan = pgTable(
+	'matchday_plan',
+	{
+		id: serial('id').primaryKey(),
+		gameweekNumber: integer('gameweek_number').notNull(),
+		mustInIds: jsonb('must_in_ids').$type<number[]>().notNull().default([]),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('matchday_plan_gw_uidx').on(t.gameweekNumber)]
+);
+
 export type MySquad = typeof mySquad.$inferSelect;
 export type FinalSquad = typeof finalSquads.$inferSelect;
 export type Sketch = typeof sketches.$inferSelect;
 export type PlayerRoundStats = typeof playerRoundStats.$inferSelect;
 export type PlayerSnapshot = typeof playerSnapshots.$inferSelect;
 export type StrategyPick = typeof strategyPicks.$inferSelect;
+export type MatchdayPlan = typeof matchdayPlan.$inferSelect;
