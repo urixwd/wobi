@@ -1,5 +1,5 @@
 {
-  "currentRound": 4,
+  "currentRound": 5,
   "source": "https://www.one.co.il/Soccer/League/1",
   "fixtures": [
     {
@@ -175,56 +175,56 @@
       "homeTeamId": 134,
       "awayTeamId": 130,
       "kickoff": "2026-09-13T20:30:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 0,
+      "awayScore": 2
     },
     {
       "gameweek": 4,
       "homeTeamId": 131,
       "awayTeamId": 129,
       "kickoff": "2026-09-14T19:30:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 3,
+      "awayScore": 1
     },
     {
       "gameweek": 4,
       "homeTeamId": 285,
       "awayTeamId": 132,
       "kickoff": "2026-09-14T19:30:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 2,
+      "awayScore": 0
     },
     {
       "gameweek": 4,
       "homeTeamId": 197,
       "awayTeamId": 138,
       "kickoff": "2026-09-14T20:00:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 0,
+      "awayScore": 4
     },
     {
       "gameweek": 4,
       "homeTeamId": 133,
       "awayTeamId": 128,
       "kickoff": "2026-09-14T20:30:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 4,
+      "awayScore": 1
     },
     {
       "gameweek": 4,
       "homeTeamId": 198,
       "awayTeamId": 136,
       "kickoff": "2026-09-15T19:30:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 2,
+      "awayScore": 2
     },
     {
       "gameweek": 4,
       "homeTeamId": 140,
       "awayTeamId": 127,
       "kickoff": "2026-09-15T20:00:00",
-      "homeScore": null,
-      "awayScore": null
+      "homeScore": 3,
+      "awayScore": 1
     },
     {
       "gameweek": 5,
