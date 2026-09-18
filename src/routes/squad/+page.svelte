@@ -82,6 +82,11 @@
 	let savedXi = $state<number[]>([...data.squad.xiPlayerIds]);
 	let savedBench = $state<number[]>([...data.squad.benchPlayerIds]);
 	let q = $state('');
+	/** Treat geresh/apostrophe variants (`, ׳, ', ’, ‘) as the same so "ג׳יימס" finds "ג`יימס". */
+	function normalizeSearch(s: string): string {
+		return s.replace(/[`'׳’‘"״“”]/g, '').trim();
+	}
+	const normQuery = $derived(normalizeSearch(q));
 	let posFilter = $state<number | 0>(0);
 	let teamFilters = $state<number[]>([]);
 	let target: 'xi' | 'bench' = $state('xi');
@@ -252,8 +257,11 @@
 					const d = runDiff(r);
 					if (!d || !runDiffFilters.includes(d)) return false;
 				}
-				if (!q.trim()) return true;
-				return r.player.name.includes(q.trim()) || (r.teamName ?? '').includes(q.trim());
+				if (!normQuery) return true;
+				return (
+					normalizeSearch(r.player.name).includes(normQuery) ||
+					normalizeSearch(r.teamName ?? '').includes(normQuery)
+				);
 			})
 			.slice()
 			.sort((a, b) => {
@@ -1095,11 +1103,23 @@
 			</div>
 
 
-			<input
-				bind:value={q}
-				placeholder="חיפוש שחקן"
-				class="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-			/>
+			<div class="relative">
+				<input
+					bind:value={q}
+					placeholder="חיפוש שחקן"
+					class="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 pl-9 text-sm"
+				/>
+				{#if q}
+					<button
+						type="button"
+						onclick={() => (q = '')}
+						aria-label="נקה חיפוש"
+						title="נקה חיפוש"
+						class="absolute left-2 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+					>×</button
+					>
+				{/if}
+			</div>
 
 			<p class="text-xs text-slate-500">{filtered.length} מתוך {poolPlayers.length} שחקנים</p>
 
