@@ -5,6 +5,7 @@
 	let { data }: { data: PageData } = $props();
 	const st = $derived(data.standings);
 	const pending = $derived(data.pending);
+	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
 
 	/** Color by objective; mode is shown via line style / a badge. */
 	const COLORS: Record<string, string> = {
@@ -74,13 +75,59 @@
 	</div>
 
 	{#if pending}
+		{@const c = pending.constraints}
+		{@const outIds = new Set(c.forcedOut)}
+		{@const inIds = new Set(c.forcedIn)}
 		<div class="space-y-3">
 			<div>
 				<h2 class="text-lg font-bold">מחזור {pending.gameweekNumber} — טרם דורג</h2>
 				<p class="text-sm text-slate-400">
-					ההרכבים שכבר נרשמו לכל שיטה. הניקוד יתווסף אחרי שהתוצאות ייכנסו.
+					האילוצים וההרכבים שנרשמו לכל שיטה. הניקוד יתווסף אחרי שהתוצאות ייכנסו.
 				</p>
 			</div>
+
+			<!-- Read-only constraint log (same lists as /watchlist) -->
+			<div class="grid gap-3 md:grid-cols-2">
+				<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
+					<h3 class="mb-2 text-sm font-semibold text-slate-300">
+						לשחרר מהקבוצה <span class="text-slate-500">({c.forcedOut.length})</span>
+					</h3>
+					<div class="flex flex-wrap gap-1.5">
+						{#each c.squad as p (p.id)}
+							{@const on = outIds.has(p.id)}
+							<span
+								class="rounded-lg border px-2 py-1 text-xs {on
+									? 'border-red-500/60 bg-red-500/20 text-red-200'
+									: 'border-slate-700 bg-slate-800/60 text-slate-400'}"
+							>
+								{on ? '✕ ' : ''}{p.name}
+								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+							</span>
+						{/each}
+					</div>
+				</div>
+				<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
+					<h3 class="mb-2 text-sm font-semibold text-slate-300">
+						חייבים להיכנס <span class="text-slate-500">({c.forcedIn.length})</span>
+					</h3>
+					<div class="flex flex-wrap gap-1.5">
+						{#each c.inbound as p (p.id)}
+							{@const on = inIds.has(p.id)}
+							<span
+								class="rounded-lg border px-2 py-1 text-xs {on
+									? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200'
+									: 'border-slate-700 bg-slate-800/60 text-slate-400'}"
+							>
+								{on ? '✓ ' : ''}{p.name}
+								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+							</span>
+						{:else}
+							<span class="text-xs text-slate-500">אין שחקנים ברשימת המחזור.</span>
+						{/each}
+					</div>
+				</div>
+			</div>
+
 			<div class="grid gap-5 lg:grid-cols-3">
 				{#each pending.picks as p (p.strategy)}
 					<LineupCard

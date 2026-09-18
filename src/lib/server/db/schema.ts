@@ -196,6 +196,9 @@ export const finalSquads = pgTable(
 		gameweekNumber: integer('gameweek_number').notNull(),
 		xiPlayerIds: jsonb('xi_player_ids').$type<number[]>().notNull().default([]),
 		benchPlayerIds: jsonb('bench_player_ids').$type<number[]>().notNull().default([]),
+		/** Constraints in effect when this matchday was recorded (frozen log). */
+		mustInIds: jsonb('must_in_ids').$type<number[]>().notNull().default([]),
+		mustOutIds: jsonb('must_out_ids').$type<number[]>().notNull().default([]),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('final_squads_gw_uidx').on(t.gameweekNumber)]

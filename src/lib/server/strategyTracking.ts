@@ -240,6 +240,12 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	const mustOut = (await getMustOut(currentGw)).filter((id) => baseIds.includes(id));
 	const mustIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
+	// Freeze the constraints onto the official snapshot (a permanent per-matchday log).
+	await db
+		.update(finalSquads)
+		.set({ mustInIds: mustIn, mustOutIds: mustOut })
+		.where(eq(finalSquads.gameweekNumber, currentGw));
+
 	// Always record the actual team.
 	const actualPlayers = (await buildTransferInputs(currentGw, currentIds)).base;
 	const actualXi = actualPlayers.filter((p) => current.xiPlayerIds.includes(p.id));
@@ -384,7 +390,18 @@ export type PendingPick = {
 	xi: PendingCardPlayer[];
 	bench: PendingCardPlayer[];
 };
-export type PendingMatchday = { gameweekNumber: number; picks: PendingPick[] } | null;
+export type ConstraintPlayer = { id: number; name: string; position: number };
+export type PendingConstraints = {
+	squad: ConstraintPlayer[]; // base squad (the release picker's list)
+	inbound: ConstraintPlayer[]; // wishlist candidates (the must-in picker's list)
+	forcedOut: number[];
+	forcedIn: number[];
+};
+export type PendingMatchday = {
+	gameweekNumber: number;
+	picks: PendingPick[];
+	constraints: PendingConstraints;
+} | null;
 
 const OBJ_ORDER = ['points', 'vlfm', 'fixtures', 'fixtures5', 'form'];
 const MODE_ORDER = ['constrained', 'out', 'free'];
@@ -446,5 +463,27 @@ export async function getPendingMatchday(): Promise<PendingMatchday> {
 		const o = OBJ_ORDER.indexOf(a.objective) - OBJ_ORDER.indexOf(b.objective);
 		return o !== 0 ? o : MODE_ORDER.indexOf(a.mode ?? '') - MODE_ORDER.indexOf(b.mode ?? '');
 	});
-	return { gameweekNumber: gw, picks: list };
+
+	// Constraint log for this matchday (frozen on the snapshot at save time).
+	const finalRow = (
+		await db.select().from(finalSquads).where(eq(finalSquads.gameweekNumber, gw)).limit(1)
+	)[0];
+	const { ids: baseIds } = await getBaseSquad(gw);
+	const { base, wishlist } = await buildTransferInputs(gw, baseIds);
+	const baseIdSet = new Set(baseIds);
+	const inbound = wishlist.filter((p) => !baseIdSet.has(p.id));
+	const inboundSet = new Set(inbound.map((p) => p.id));
+	const asCP = (p: { id: number; name: string; position: number }) => ({
+		id: p.id,
+		name: p.name,
+		position: p.position
+	});
+	const constraints: PendingConstraints = {
+		squad: base.map(asCP).sort((a, b) => a.position - b.position),
+		inbound: inbound.map(asCP).sort((a, b) => a.position - b.position),
+		forcedOut: (finalRow?.mustOutIds ?? []).filter((id) => baseIdSet.has(id)),
+		forcedIn: (finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id))
+	};
+
+	return { gameweekNumber: gw, picks: list, constraints };
 }
