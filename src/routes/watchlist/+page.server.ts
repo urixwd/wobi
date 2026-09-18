@@ -115,8 +115,7 @@ export const load: PageServerLoad = async () => {
 		feasible: MODES.some((m) => modeResults[m.key].feasible),
 		notes: modeResults.free.feasible ? [] : modeResults.free.notes,
 		capped: MODES.some((m) => modeResults[m.key].capped),
-		byObjective,
-		topPoints: modeResults.constrained.topPoints
+		byObjective
 	};
 
 	const squadForPicker = [...base].sort((a, b) => a.position - b.position || b.points - a.points);

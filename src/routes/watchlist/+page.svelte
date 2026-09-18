@@ -18,6 +18,8 @@
 	const roundIds = $derived(new Set(data.round.map((i) => i.player.id)));
 
 	const transfers = $derived(data.transfers);
+	type Obj = (typeof transfers)['byObjective'][number];
+	type Variant = Obj['variants'][number];
 	const outSet = $derived(new Set(data.forcedOut));
 	const inSet = $derived(new Set(data.forcedIn));
 	const MAX_OUT = 3;
@@ -25,6 +27,49 @@
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
 
 	// Both pickers persist server-side per matchday (forms below).
+
+	// Mode filter (חופשי / יציאה בלבד / מוגבל), persisted locally.
+	const allModes = $derived(
+		transfers.byObjective[0]?.variants.map((v) => ({ key: v.mode, label: v.modeLabel })) ?? []
+	);
+	const MODES_KEY = 'wobi.watchlist.modes';
+	let selectedModes = $state<string[]>(['constrained', 'out', 'free']);
+	let modesLoaded = $state(false);
+	$effect(() => {
+		if (!modesLoaded) {
+			modesLoaded = true;
+			try {
+				const raw = localStorage.getItem(MODES_KEY);
+				if (raw) {
+					const a = JSON.parse(raw);
+					if (Array.isArray(a) && a.length) selectedModes = a;
+				}
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		try {
+			localStorage.setItem(MODES_KEY, JSON.stringify(selectedModes));
+		} catch {
+			/* ignore */
+		}
+	});
+	let modeMenuOpen = $state(false);
+	function toggleMode(key: string) {
+		if (selectedModes.includes(key)) {
+			if (selectedModes.length === 1) return; // keep at least one
+			selectedModes = selectedModes.filter((k) => k !== key);
+		} else {
+			selectedModes = [...selectedModes, key];
+		}
+	}
+	const shownModes = $derived(allModes.filter((m) => selectedModes.includes(m.key)));
+	const singleMode = $derived(shownModes.length === 1);
+
+	// Per-objective collapse (default open).
+	let collapsed = $state<Record<string, boolean>>({});
+	const toggleCollapse = (key: string) => (collapsed[key] = !collapsed[key]);
 
 	function comboStats(c: TransferCombo) {
 		return [
@@ -315,65 +360,90 @@
 				<p class="text-xs text-slate-500">הרשימה גדולה — מוצגות ההצעות הטובות ביותר מתוך חיפוש מוגבל.</p>
 			{/if}
 
-			<p class="text-xs text-slate-500">
-				לכל דירוג שלוש גרסאות: <span class="text-slate-300">מוגבל</span> (מכבד יציאה+כניסה),
-				<span class="text-slate-300">יציאה בלבד</span>, ו<span class="text-slate-300">חופשי</span>.
-			</p>
-			{#each transfers.byObjective as o (o.key)}
-				<div>
-					<h3 class="mb-2 text-sm font-semibold text-slate-300">{o.title}</h3>
-					<div class="grid gap-5 lg:grid-cols-3">
-						{#each o.variants as v (v.mode)}
-							{#if v.combo}
-								<LineupCard
-									title={v.modeLabel}
-									subtitle={objSubtitle[o.key]?.(v.combo) ?? null}
-									formation={v.combo.formation}
-									transfersUsed={v.combo.transfersUsed}
-									stats={comboStats(v.combo)}
-									xi={v.combo.xi}
-									bench={v.combo.bench}
-									out={v.combo.out}
-									inn={v.combo.in}
-									actions
-									sketchName={`${o.title} · ${v.modeLabel} · מחזור ${data.currentGw}`}
-									gameweekNumber={data.currentGw}
-								/>
-							{:else}
-								<div
-									class="flex items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-900/40 p-4 text-center text-xs text-slate-500"
+			<!-- Mode filter (persisted locally) -->
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<p class="text-xs text-slate-500">בחר אילו מצבי חילוף להציג.</p>
+				<div class="relative">
+					<button
+						type="button"
+						onclick={() => (modeMenuOpen = !modeMenuOpen)}
+						class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200"
+					>
+						מצבים ({shownModes.length}) ▾
+					</button>
+					{#if modeMenuOpen}
+						<div
+							class="absolute left-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-lg"
+						>
+							{#each allModes as m (m.key)}
+								<label
+									class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
 								>
-									{v.modeLabel}: אין הרכב חוקי במצב הזה
-								</div>
-							{/if}
-						{/each}
-					</div>
+									<input
+										type="checkbox"
+										checked={selectedModes.includes(m.key)}
+										onchange={() => toggleMode(m.key)}
+									/>
+									{m.label}
+								</label>
+							{/each}
+						</div>
+					{/if}
 				</div>
-			{/each}
+			</div>
 
-			{#if transfers.topPoints.length}
-				<div>
-					<h3 class="mb-2 text-sm font-semibold text-slate-300">חמש ההצעות המובילות לפי נקודות</h3>
-					<div class="grid gap-5 lg:grid-cols-2">
-						{#each transfers.topPoints as c, i (c.id)}
-							<LineupCard
-								title={`דירוג נקודות #${i + 1}`}
-								subtitle={`${c.points} נק׳ · vlfm ${c.vlfm.toFixed(2)}`}
-								badge={`#${i + 1}`}
-								formation={c.formation}
-								transfersUsed={c.transfersUsed}
-								stats={comboStats(c)}
-								xi={c.xi}
-								bench={c.bench}
-								out={c.out}
-								inn={c.in}
-								actions
-								sketchName={`דירוג נקודות #${i + 1} · מחזור ${data.currentGw}`}
-								gameweekNumber={data.currentGw}
-							/>
-						{/each}
+			{#snippet card(title: string, o: Obj, v: Variant)}
+				{#if v.combo}
+					<LineupCard
+						{title}
+						subtitle={objSubtitle[o.key]?.(v.combo) ?? null}
+						formation={v.combo.formation}
+						transfersUsed={v.combo.transfersUsed}
+						stats={comboStats(v.combo)}
+						xi={v.combo.xi}
+						bench={v.combo.bench}
+						out={v.combo.out}
+						inn={v.combo.in}
+						actions
+						sketchName={`${o.title} · ${v.modeLabel} · מחזור ${data.currentGw}`}
+						gameweekNumber={data.currentGw}
+					/>
+				{:else}
+					<div
+						class="flex items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-900/40 p-4 text-center text-xs text-slate-500"
+					>
+						{v.modeLabel}: אין הרכב חוקי במצב הזה
 					</div>
+				{/if}
+			{/snippet}
+
+			{#if singleMode}
+				<div class="grid gap-5 lg:grid-cols-3">
+					{#each transfers.byObjective as o (o.key)}
+						{@const v = o.variants.find((x) => x.mode === shownModes[0].key)}
+						{#if v}{@render card(o.title, o, v)}{/if}
+					{/each}
 				</div>
+			{:else}
+				{#each transfers.byObjective as o (o.key)}
+					<div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
+						<button
+							type="button"
+							onclick={() => toggleCollapse(o.key)}
+							class="flex w-full items-center justify-between gap-2 px-4 py-3 text-right text-xl font-bold text-slate-100 hover:bg-slate-800/50"
+						>
+							<span>{o.title}</span>
+							<span class="text-slate-500">{collapsed[o.key] ? '▸' : '▾'}</span>
+						</button>
+						{#if !collapsed[o.key]}
+							<div class="grid gap-5 p-3 lg:grid-cols-3">
+								{#each o.variants.filter((v) => selectedModes.includes(v.mode)) as v (v.mode)}
+									{@render card(v.modeLabel, o, v)}
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
 			{/if}
 		{/if}
 	</div>
