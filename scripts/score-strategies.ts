@@ -11,7 +11,18 @@
  */
 import { asc, eq } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client';
-import { gameweeks, playerSnapshots, strategyPicks } from '../src/lib/server/db/schema';
+import { gameweeks, players, playerSnapshots, strategyPicks } from '../src/lib/server/db/schema';
+
+type RoundStats = { points?: number; totalPoints?: number; roundId?: number; statsData?: string } | null;
+
+function minutesPlayed(st: RoundStats): number {
+	try {
+		const d = typeof st?.statsData === 'string' ? JSON.parse(st.statsData) : st?.statsData;
+		return Number(d?.MinutesPlayed?.Count ?? 0) || 0;
+	} catch {
+		return 0;
+	}
+}
 
 function parseRound(argv: string[]): number | null {
 	for (const a of argv) if (a.startsWith('--round=')) return Number(a.slice(8));
@@ -33,12 +44,40 @@ try {
 			.select()
 			.from(playerSnapshots)
 			.where(eq(playerSnapshots.gameweekNumber, round + 1));
-		const pts = new Map<number, number>();
+		// A player who sat out round N keeps an older round's stats in the dump,
+		// so only count stats from round N's Sport5 roundId (the most common one).
+		const ridCount = new Map<number, number>();
 		for (const s of snaps) {
-			const st = s.lastRoundPlayerStats as { points?: number; totalPoints?: number } | null;
+			const rid = Number((s.lastRoundPlayerStats as RoundStats)?.roundId);
+			if (Number.isFinite(rid)) ridCount.set(rid, (ridCount.get(rid) ?? 0) + 1);
+		}
+		const roundRid = [...ridCount].sort((a, b) => b[1] - a[1])[0]?.[0];
+		const pts = new Map<number, number>();
+		const played = new Set<number>();
+		for (const s of snaps) {
+			const st = s.lastRoundPlayerStats as RoundStats;
+			if (Number(st?.roundId) !== roundRid) continue;
 			const n = Number(st?.points ?? st?.totalPoints);
 			pts.set(s.playerId, Number.isFinite(n) ? n : 0);
+			if (minutesPlayed(st) > 0) played.add(s.playerId);
 		}
+		const posOf = new Map(
+			(await db.select({ id: players.id, position: players.position }).from(players)).map((p) => [p.id, p.position])
+		);
+		// Sport5 auto-sub: an XI player who didn't play is replaced by the bench player of the same position.
+		const scoreXi = (xi: number[], bench: number[]) => {
+			const pool = [...bench];
+			let total = 0;
+			for (const id of xi) {
+				if (played.has(id)) {
+					total += pts.get(id) ?? 0;
+					continue;
+				}
+				const i = pool.findIndex((b) => posOf.get(b) === posOf.get(id));
+				if (i >= 0) total += pts.get(pool.splice(i, 1)[0]) ?? 0;
+			}
+			return total;
+		};
 		if (pts.size === 0) {
 			console.log(
 				`No player_snapshots for GW ${round + 1}. Import the post-round-${round} dump first (--gw=${round + 1}).`
@@ -50,7 +89,7 @@ try {
 				.where(eq(strategyPicks.gameweekNumber, round))
 				.orderBy(asc(strategyPicks.strategy));
 			for (const pk of picks) {
-				const total = pk.xiPlayerIds.reduce((s, id) => s + (pts.get(id) ?? 0), 0);
+				const total = scoreXi(pk.xiPlayerIds as number[], (pk.benchPlayerIds as number[]) ?? []);
 				await db
 					.update(strategyPicks)
 					.set({ points: Math.round(total * 10) / 10, updatedAt: new Date() })
