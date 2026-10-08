@@ -8,10 +8,11 @@
  * round watchlist. Once a round's results are imported, `scoreRound` fills each
  * pick's XI points, and `getStandings` tallies the season.
  */
-import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm';
+import { asc, desc, eq, inArray, lt } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import {
 	finalSquads,
+	gameweeks,
 	matchdayPlan,
 	mySquad,
 	players,
@@ -112,7 +113,11 @@ async function wishlistRows(currentGw: number): Promise<Row[]> {
 		.where(eq(watchlistRound.gameweekNumber, currentGw));
 }
 
-/** The team the matchday starts from: previous matchday's snapshot, else live my_squad. */
+/**
+ * The team the matchday starts from: the latest official squad before it (the
+ * pre-tracking GW4 one counts too, so GW5's history doesn't drift with my_squad),
+ * else live my_squad.
+ */
 export async function getBaseSquad(
 	currentGw: number
 ): Promise<{ ids: number[]; fromGw: number | null }> {
@@ -120,9 +125,7 @@ export async function getBaseSquad(
 		await db
 			.select()
 			.from(finalSquads)
-			.where(
-				and(gte(finalSquads.gameweekNumber, TRACKING_START_GW), lt(finalSquads.gameweekNumber, currentGw))
-			)
+			.where(lt(finalSquads.gameweekNumber, currentGw))
 			.orderBy(desc(finalSquads.gameweekNumber))
 			.limit(1)
 	)[0];
@@ -170,6 +173,22 @@ export async function setMustOut(gameweekNumber: number, ids: number[]): Promise
 			target: matchdayPlan.gameweekNumber,
 			set: { mustOutIds: ids, updatedAt: new Date() }
 		});
+}
+
+/** Toggle a player in a matchday planner (max 3). Returns an error message when full. */
+export async function toggleMustPick(
+	kind: 'in' | 'out',
+	gameweekNumber: number,
+	playerId: number
+): Promise<string | null> {
+	const cur = new Set(kind === 'in' ? await getMustIn(gameweekNumber) : await getMustOut(gameweekNumber));
+	if (cur.has(playerId)) cur.delete(playerId);
+	else {
+		if (cur.size >= 3) return kind === 'in' ? 'עד 3 שחייבים להיכנס' : 'עד 3 לשחרר';
+		cur.add(playerId);
+	}
+	await (kind === 'in' ? setMustIn : setMustOut)(gameweekNumber, [...cur]);
+	return null;
 }
 
 /** Build base + wishlist TPlayers for the transfer engine (shared by page + recorder). */
@@ -220,17 +239,25 @@ async function upsertPick(row: {
 		});
 }
 
-/**
- * Record the actual team + the 4 strategies' what-if for `currentGw`.
- * Call right after the user's final team is saved into `final_squads[currentGw]`.
- */
-export async function recordWhatIf(currentGw: number): Promise<{ recorded: string[] }> {
-	const current = (
-		await db.select().from(finalSquads).where(eq(finalSquads.gameweekNumber, currentGw)).limit(1)
-	)[0];
-	if (!current) return { recorded: [] };
-	const currentIds = [...current.xiPlayerIds, ...current.benchPlayerIds];
+type WhatIfRow = {
+	strategy: string;
+	xiPlayerIds: number[];
+	benchPlayerIds: number[];
+	formation: string | null;
+	spend: number | null;
+	releasedPlayerIds: number[];
+};
 
+/**
+ * The actual team + each strategy's what-if for `currentGw`, from the given
+ * squad and the persisted must-in / must-out planners. Pure: writes nothing.
+ */
+async function computeWhatIf(
+	currentGw: number,
+	xiIds: number[],
+	benchIds: number[]
+): Promise<{ rows: WhatIfRow[]; mustIn: number[]; mustOut: number[] }> {
+	const currentIds = [...xiIds, ...benchIds];
 	const { ids: baseIds, fromGw } = await getBaseSquad(currentGw);
 	const released = fromGw != null ? detectReleased(baseIds, currentIds) : [];
 
@@ -240,27 +267,20 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	const mustOut = (await getMustOut(currentGw)).filter((id) => baseIds.includes(id));
 	const mustIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
-	// Freeze the constraints onto the official snapshot (a permanent per-matchday log).
-	await db
-		.update(finalSquads)
-		.set({ mustInIds: mustIn, mustOutIds: mustOut })
-		.where(eq(finalSquads.gameweekNumber, currentGw));
-
-	// Always record the actual team.
 	const actualPlayers = (await buildTransferInputs(currentGw, currentIds)).base;
-	const actualXi = actualPlayers.filter((p) => current.xiPlayerIds.includes(p.id));
-	await upsertPick({
-		gameweekNumber: currentGw,
-		strategy: 'actual',
-		xiPlayerIds: current.xiPlayerIds,
-		benchPlayerIds: current.benchPlayerIds,
-		formation: formationOf(actualXi),
-		spend: spendOf(actualPlayers),
-		releasedPlayerIds: released
-	});
-	const recorded = ['actual'];
+	const actualXi = actualPlayers.filter((p) => xiIds.includes(p.id));
+	const rows: WhatIfRow[] = [
+		{
+			strategy: 'actual',
+			xiPlayerIds: xiIds,
+			benchPlayerIds: benchIds,
+			formation: formationOf(actualXi),
+			spend: spendOf(actualPlayers),
+			releasedPlayerIds: released
+		}
+	];
 
-	// Record each strategy under three constraint modes. (At the first tracked
+	// Each strategy under three constraint modes. (At the first tracked
 	// matchday there's no previous team, so the base is the current squad.)
 	const modeDefs = [
 		{ mode: 'constrained', out: new Set(mustOut), in: new Set(mustIn), rel: mustOut },
@@ -271,20 +291,43 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 		const res = buildTransfers(base, wishlist, md.out, md.in, 3);
 		for (const b of res.best) {
 			if (!b.combo) continue;
-			const key = strategyKey(b.key, md.mode);
-			await upsertPick({
-				gameweekNumber: currentGw,
-				strategy: key,
+			rows.push({
+				strategy: strategyKey(b.key, md.mode),
 				xiPlayerIds: b.combo.xi.map((p) => p.id),
 				benchPlayerIds: b.combo.bench.map((p) => p.id),
 				formation: b.combo.formation,
 				spend: b.combo.spend,
 				releasedPlayerIds: md.rel
 			});
-			recorded.push(key);
 		}
 	}
-	return { recorded };
+	return { rows, mustIn, mustOut };
+}
+
+/**
+ * Record the actual team + the 4 strategies' what-if for `currentGw`.
+ * Call right after the user's final team is saved into `final_squads[currentGw]`.
+ */
+export async function recordWhatIf(currentGw: number): Promise<{ recorded: string[] }> {
+	const current = (
+		await db.select().from(finalSquads).where(eq(finalSquads.gameweekNumber, currentGw)).limit(1)
+	)[0];
+	if (!current) return { recorded: [] };
+
+	const { rows, mustIn, mustOut } = await computeWhatIf(
+		currentGw,
+		current.xiPlayerIds,
+		current.benchPlayerIds
+	);
+
+	// Freeze the constraints onto the official snapshot (a permanent per-matchday log).
+	await db
+		.update(finalSquads)
+		.set({ mustInIds: mustIn, mustOutIds: mustOut })
+		.where(eq(finalSquads.gameweekNumber, currentGw));
+
+	for (const r of rows) await upsertPick({ gameweekNumber: currentGw, ...r });
+	return { recorded: rows.map((r) => r.strategy) };
 }
 
 /** XI round points for round N come from the dump taken after it: snapshot[N+1]. */
@@ -390,6 +433,9 @@ export type PendingPick = {
 	points: number | null; // XI round points once scored
 	xi: PendingCardPlayer[];
 	bench: PendingCardPlayer[];
+	/** Transfers vs. the team the matchday started from (see `baseFromGw`). */
+	out: ConstraintPlayer[];
+	in: ConstraintPlayer[];
 };
 export type ConstraintPlayer = { id: number; name: string; position: number };
 export type PendingConstraints = {
@@ -401,6 +447,10 @@ export type PendingConstraints = {
 export type MatchdayDetail = {
 	gameweekNumber: number;
 	scored: boolean;
+	/** Not recorded yet: computed now from my_squad + this matchday's planners. */
+	live: boolean;
+	/** Matchday whose official squad is the transfer base (null = live my_squad). */
+	baseFromGw: number | null;
 	picks: PendingPick[];
 	constraints: PendingConstraints;
 } | null;
@@ -416,7 +466,19 @@ export async function getRecordedGameweeks(): Promise<number[]> {
 
 /** One matchday's recorded line-ups + constraints, hydrated for display. */
 export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
-	const picks = await db.select().from(strategyPicks).where(eq(strategyPicks.gameweekNumber, gw));
+	const recorded = await db.select().from(strategyPicks).where(eq(strategyPicks.gameweekNumber, gw));
+	const live = !recorded.length;
+	let picks: { strategy: string; xiPlayerIds: number[]; benchPlayerIds: number[]; formation: string | null; spend: number | null; points: number | null }[] = recorded;
+	let liveConstraints: { mustIn: number[]; mustOut: number[] } | null = null;
+	if (live) {
+		// Only the open matchday gets a live preview; a past unrecorded one has nothing to show.
+		const cur = (await db.select().from(gameweeks).where(eq(gameweeks.isCurrent, true)).limit(1))[0];
+		const squad = (await db.select().from(mySquad).limit(1))[0];
+		if (cur?.number !== gw || !squad) return null;
+		const res = await computeWhatIf(gw, squad.xiPlayerIds, squad.benchPlayerIds);
+		picks = res.rows.map((r) => ({ ...r, points: null }));
+		liveConstraints = { mustIn: res.mustIn, mustOut: res.mustOut };
+	}
 	if (!picks.length) return null;
 	const scored = picks.some((r) => r.points != null);
 
@@ -461,7 +523,9 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 			spend: p.spend,
 			points: p.points,
 			xi: hydrate(p.xiPlayerIds),
-			bench: hydrate(p.benchPlayerIds)
+			bench: hydrate(p.benchPlayerIds),
+			out: [],
+			in: []
 		};
 	});
 	list.sort((a, b) => {
@@ -475,9 +539,20 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 	const finalRow = (
 		await db.select().from(finalSquads).where(eq(finalSquads.gameweekNumber, gw)).limit(1)
 	)[0];
-	const { ids: baseIds } = await getBaseSquad(gw);
+	const { ids: baseIds, fromGw: baseFromGw } = await getBaseSquad(gw);
 	const { base, wishlist } = await buildTransferInputs(gw, baseIds);
 	const baseIdSet = new Set(baseIds);
+
+	// Each pick's transfers vs. the base team (out in base order, in by position).
+	for (const pk of list) {
+		const ids = new Set([...pk.xi, ...pk.bench].map((p) => p.id));
+		pk.out = base.filter((p) => !ids.has(p.id)).map((p) => ({ id: p.id, name: p.name, position: p.position }));
+		pk.in = [...pk.xi, ...pk.bench]
+			.filter((p) => !baseIdSet.has(p.id))
+			.map((p) => ({ id: p.id, name: p.name, position: p.position }));
+		pk.out.sort((a, b) => a.position - b.position);
+		pk.in.sort((a, b) => a.position - b.position);
+	}
 	const inbound = wishlist.filter((p) => !baseIdSet.has(p.id));
 	const inboundSet = new Set(inbound.map((p) => p.id));
 	const asCP = (p: { id: number; name: string; position: number }) => ({
@@ -488,9 +563,9 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 	const constraints: PendingConstraints = {
 		squad: base.map(asCP).sort((a, b) => a.position - b.position),
 		inbound: inbound.map(asCP).sort((a, b) => a.position - b.position),
-		forcedOut: (finalRow?.mustOutIds ?? []).filter((id) => baseIdSet.has(id)),
-		forcedIn: (finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id))
+		forcedOut: (liveConstraints?.mustOut ?? finalRow?.mustOutIds ?? []).filter((id) => baseIdSet.has(id)),
+		forcedIn: (liveConstraints?.mustIn ?? finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id))
 	};
 
-	return { gameweekNumber: gw, scored, picks: list, constraints };
+	return { gameweekNumber: gw, scored, live, baseFromGw, picks: list, constraints };
 }

@@ -15,7 +15,8 @@ import {
 	getMustOut,
 	MODES,
 	setMustIn,
-	setMustOut
+	setMustOut,
+	toggleMustPick
 } from '$lib/server/strategyTracking';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -175,14 +176,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const playerId = Number(form.get('playerId'));
 		if (!playerId) return fail(400, { message: 'חסר שחקן' });
-		const currentGw = await resolveCurrentGwNumber(4);
-		const cur = new Set(await getMustIn(currentGw));
-		if (cur.has(playerId)) cur.delete(playerId);
-		else {
-			if (cur.size >= 3) return fail(400, { message: 'עד 3 שחייבים להיכנס' });
-			cur.add(playerId);
-		}
-		await setMustIn(currentGw, [...cur]);
+		const err = await toggleMustPick('in', await resolveCurrentGwNumber(4), playerId);
+		if (err) return fail(400, { message: err });
 		return { success: true };
 	},
 	clearMustIn: async () => {
@@ -195,14 +190,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const playerId = Number(form.get('playerId'));
 		if (!playerId) return fail(400, { message: 'חסר שחקן' });
-		const currentGw = await resolveCurrentGwNumber(4);
-		const cur = new Set(await getMustOut(currentGw));
-		if (cur.has(playerId)) cur.delete(playerId);
-		else {
-			if (cur.size >= 3) return fail(400, { message: 'עד 3 לשחרר' });
-			cur.add(playerId);
-		}
-		await setMustOut(currentGw, [...cur]);
+		const err = await toggleMustPick('out', await resolveCurrentGwNumber(4), playerId);
+		if (err) return fail(400, { message: err });
 		return { success: true };
 	},
 	clearMustOut: async () => {
