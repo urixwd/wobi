@@ -6,7 +6,10 @@
 
 	let { children } = $props();
 
-	const fullWidth = $derived($page.url.pathname === '/squad' || $page.url.pathname.startsWith('/squad/'));
+	const under = (r: string) => $page.url.pathname === r || $page.url.pathname.startsWith(`${r}/`);
+	// /squad: edge to edge. /strategies: wide, but with breathing room on the sides.
+	const fullWidth = $derived(under('/squad'));
+	const wide = $derived(under('/strategies'));
 </script>
 
 <svelte:head>
@@ -15,6 +18,12 @@
 </svelte:head>
 
 <Nav />
-<main class="px-4 py-6 {fullWidth ? 'w-full max-w-none' : 'mx-auto max-w-6xl'}">
+<main
+	class="py-6 {fullWidth
+		? 'w-full max-w-none px-4'
+		: wide
+			? 'mx-auto max-w-[112rem] px-4 sm:px-8 lg:px-12'
+			: 'mx-auto max-w-6xl px-4'}"
+>
 	{@render children()}
 </main>

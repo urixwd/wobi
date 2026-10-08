@@ -26,8 +26,12 @@
 		out?: NamePlayer[];
 		inn?: NamePlayer[];
 		transfersUsed?: number | null;
+		/** When set, always show the transfers box with this header (e.g. «חילופים מול הקבוצה השמורה»). */
+		diffLabel?: string | null;
 		/** When true, show «הוסף לסקיצה» + «החל על הקבוצה שלי» (needs xi+bench = full 15). */
 		actions?: boolean;
+		/** With `actions`: hide «הוסף לסקיצה» (pages without a saveSketch action). */
+		sketchButton?: boolean;
 		sketchName?: string;
 		gameweekNumber?: number | null;
 	};
@@ -43,7 +47,9 @@
 		out = [],
 		inn = [],
 		transfersUsed = null,
+		diffLabel = null,
 		actions = false,
+		sketchButton = true,
 		sketchName = 'סקיצה',
 		gameweekNumber = null
 	}: Props = $props();
@@ -122,7 +128,40 @@
 		</div>
 	{/if}
 
-	{#if out.length || inn.length}
+	{#if diffLabel}
+		<div class="rounded-xl border border-slate-700/80 bg-slate-950/50 p-3">
+			<div class="mb-2 text-xs font-medium text-slate-400">
+				{diffLabel}
+				<span class="text-slate-500">· {out.length} יוצאים / {inn.length} נכנסים</span>
+			</div>
+			{#if out.length === 0 && inn.length === 0}
+				<p class="text-xs text-slate-500">ללא חילופים</p>
+			{:else}
+				<div class="grid gap-3 sm:grid-cols-2">
+					<div>
+						<div class="mb-1 text-[11px] text-red-300">יוצאים</div>
+						<ul class="space-y-0.5 text-xs text-slate-200">
+							{#each out as p (p.id)}
+								<li class="truncate">{p.name}</li>
+							{:else}
+								<li class="text-slate-500">—</li>
+							{/each}
+						</ul>
+					</div>
+					<div>
+						<div class="mb-1 text-[11px] text-emerald-300">נכנסים</div>
+						<ul class="space-y-0.5 text-xs text-slate-200">
+							{#each inn as p (p.id)}
+								<li class="truncate">{p.name}</li>
+							{:else}
+								<li class="text-slate-500">—</li>
+							{/each}
+						</ul>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{:else if out.length || inn.length}
 		<div class="grid gap-3 rounded-xl border border-slate-700/80 bg-slate-950/50 p-3 sm:grid-cols-2">
 			<div>
 				<div class="mb-1 text-[11px] text-red-300">יוצאים</div>
@@ -149,6 +188,7 @@
 
 	{#if actions}
 		<div class="mt-auto flex flex-wrap gap-2 pt-1">
+			{#if sketchButton}
 			<form method="POST" action="?/saveSketch" use:enhance class="flex-1">
 				<input type="hidden" name="xi" value={xiIds} />
 				<input type="hidden" name="bench" value={benchIds} />
@@ -163,6 +203,7 @@
 					הוסף לסקיצה
 				</button>
 			</form>
+			{/if}
 			<form method="POST" action="?/apply" use:enhance class="flex-1">
 				<input type="hidden" name="xi" value={xiIds} />
 				<input type="hidden" name="bench" value={benchIds} />

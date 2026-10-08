@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import LineupCard from '$lib/components/LineupCard.svelte';
 	import type { PageData } from './$types';
 
@@ -25,7 +26,6 @@
 	const colorOf = (objective: string) => COLORS[objective] ?? '#94a3b8';
 	const dashOf = (mode: string | null) =>
 		mode === 'out' ? '6 3' : mode === 'free' ? '2 3' : undefined; // constrained & actual: solid
-	const actualTotal = $derived(st.series.find((s) => s.key === 'actual')?.total ?? 0);
 	const fmtDelta = (d: number) => (d > 0 ? `+${d}` : `${d}`);
 
 	const MODE_TABS = [
@@ -36,7 +36,61 @@
 	let selectedMode = $state('constrained');
 	// Chart shows one mode at a time (+ your actual), to stay legible.
 	const chartSeries = $derived(st.series.filter((s) => s.key === 'actual' || s.mode === selectedMode));
-	const leaderboard = $derived([...st.series].sort((a, b) => b.total - a.total));
+
+	// Lineups grouped by strategy (one collapsible row each), in the server's order.
+	const pickGroups = $derived.by(() => {
+		const groups: { key: string; label: string; picks: NonNullable<typeof detail>['picks'] }[] = [];
+		for (const p of detail?.picks ?? []) {
+			let g = groups.find((x) => x.key === p.objective);
+			if (!g) groups.push((g = { key: p.objective, label: p.label, picks: [] }));
+			g.picks.push(p);
+		}
+		return groups;
+	});
+
+	// Open/closed per strategy row, persisted locally. Default: only «הבחירה שלי» open.
+	const COLLAPSE_KEY = 'wobi.strategies.open';
+	let openRows = $state<Record<string, boolean>>({});
+	let openLoaded = $state(false);
+	$effect(() => {
+		if (!openLoaded) {
+			openLoaded = true;
+			try {
+				const raw = localStorage.getItem(COLLAPSE_KEY);
+				const o = raw ? JSON.parse(raw) : null;
+				if (o && typeof o === 'object') openRows = o;
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		try {
+			localStorage.setItem(COLLAPSE_KEY, JSON.stringify(openRows));
+		} catch {
+			/* ignore */
+		}
+	});
+	const isRowOpen = (key: string) => openRows[key] ?? key === 'actual';
+	const toggleRow = (key: string) => (openRows[key] = !isRowOpen(key));
+
+	// Leaderboard view: season total, or one scored matchday (default: the latest).
+	let boardView = $state<'total' | 'gw'>('total');
+	let boardGwPick = $state<number | null>(null);
+	const scoredGws = $derived(st.gameweeks);
+	const boardGw = $derived(
+		boardGwPick != null && scoredGws.includes(boardGwPick) ? boardGwPick : (scoredGws.at(-1) ?? null)
+	);
+	const boardGwIdx = $derived(boardGw != null ? scoredGws.indexOf(boardGw) : -1);
+	const boardPrev = $derived(boardGwIdx > 0 ? scoredGws[boardGwIdx - 1] : null);
+	const boardNext = $derived(boardGwIdx >= 0 && boardGwIdx < scoredGws.length - 1 ? scoredGws[boardGwIdx + 1] : null);
+	const boardPts = (s: (typeof st.series)[number]) =>
+		boardView === 'total' ? s.total : (s.perGw.find((p) => p.gw === boardGw)?.points ?? 0);
+	const leaderboard = $derived([...st.series].sort((a, b) => boardPts(b) - boardPts(a)));
+	const boardActual = $derived.by(() => {
+		const a = st.series.find((s) => s.key === 'actual');
+		return a ? boardPts(a) : 0;
+	});
+	const boardLeader = $derived(leaderboard[0]?.key ?? null);
 
 	// Chart geometry (viewBox units).
 	const W = 720;
@@ -62,10 +116,38 @@
 		for (let v = 0; v <= maxY + 1e-6; v += step) ticks.push(Math.round(v));
 		return ticks;
 	});
-	const xFor = (i: number) => (gws.length <= 1 ? padL + plotW / 2 : padL + (i / (gws.length - 1)) * plotW);
+	// Inset so the first/last value labels don't hit the y-axis or the edge.
+	const padX = 18;
+	const xFor = (i: number) =>
+		gws.length <= 1 ? padL + plotW / 2 : padL + padX + (i / (gws.length - 1)) * (plotW - 2 * padX);
 	const yFor = (v: number) => padT + plotH - (v / maxY) * plotH;
 	const linePoints = (perGw: { cumulative: number }[]) =>
 		perGw.map((p, i) => `${xFor(i)},${yFor(p.cumulative)}`).join(' ');
+
+	// Value labels: per matchday, stack labels that would overlap (sorted by y, min gap apart).
+	const LABEL_H = 15;
+	const LABEL_GAP = 2;
+	// Approximate width of "<label> · <points>" at font-size 10.
+	const labelW = (name: string, v: number) => name.length * 5.4 + String(v).length * 6.5 + 22;
+	// Keep wide labels inside the plot at the first/last matchday.
+	const labelX = (x: number, w: number) => Math.min(Math.max(x, padL + w / 2), W - padR - w / 2);
+	const labelY = $derived.by(() => {
+		const out = new Map<string, number[]>();
+		for (const s of chartSeries) out.set(s.key, []);
+		gws.forEach((_, i) => {
+			const col = chartSeries
+				.filter((s) => s.perGw[i])
+				.map((s) => ({ key: s.key, y: yFor(s.perGw[i].cumulative) }))
+				.sort((a, b) => a.y - b.y);
+			const step = LABEL_H + LABEL_GAP;
+			for (let j = 1; j < col.length; j++) col[j].y = Math.max(col[j].y, col[j - 1].y + step);
+			// Pushed past the bottom: shift the whole stack back up.
+			const over = col.length ? col[col.length - 1].y - (padT + plotH) : 0;
+			if (over > 0) for (const c of col) c.y -= over;
+			for (const c of col) out.get(c.key)![i] = c.y;
+		});
+		return out;
+	});
 </script>
 
 <svelte:head><title>מעקב אסטרטגיות · WOBI</title></svelte:head>
@@ -91,11 +173,19 @@
 						מחזור {detail.gameweekNumber}
 						{#if detail.scored}
 							<span class="text-sm font-normal text-emerald-300">· דורג</span>
+						{:else if detail.live}
+							<span class="text-sm font-normal text-sky-300">· מחזור פתוח — תצוגה חיה</span>
 						{:else}
 							<span class="text-sm font-normal text-slate-500">· טרם דורג</span>
 						{/if}
 					</h2>
-					<p class="text-sm text-slate-400">האילוצים וההרכבים שנרשמו לכל שיטה.</p>
+					<p class="text-sm text-slate-400">
+						{#if detail.live}
+							מחושב עכשיו מהסגל הנוכחי והאילוצים של המחזור. נרשם כשלוחצים «שמור קבוצה» ב־/squad.
+						{:else}
+							האילוצים וההרכבים שנרשמו לכל שיטה.
+						{/if}
+					</p>
 				</div>
 				<div class="flex items-center gap-1">
 					{#if prevGw != null}
@@ -111,7 +201,7 @@
 				</div>
 			</div>
 
-			<!-- Read-only constraint log (same lists as /watchlist) -->
+			<!-- Constraint log (same lists as /watchlist); editable for the open matchday only -->
 			<div class="grid gap-3 md:grid-cols-2">
 				<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
 					<h3 class="mb-2 text-sm font-semibold text-slate-300">
@@ -120,14 +210,27 @@
 					<div class="flex flex-wrap gap-1.5">
 						{#each c.squad as p (p.id)}
 							{@const on = outIds.has(p.id)}
-							<span
-								class="rounded-lg border px-2 py-1 text-xs {on
-									? 'border-red-500/60 bg-red-500/20 text-red-200'
-									: 'border-slate-700 bg-slate-800/60 text-slate-400'}"
-							>
-								{on ? '✕ ' : ''}{p.name}
-								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
-							</span>
+							{@const cls = `rounded-lg border px-2 py-1 text-xs ${on
+								? 'border-red-500/60 bg-red-500/20 text-red-200'
+								: 'border-slate-700 bg-slate-800/60 text-slate-400'}`}
+							{#if detail.live}
+								<form method="POST" action="?/toggleMustOut" use:enhance>
+									<input type="hidden" name="playerId" value={p.id} />
+									<button
+										type="submit"
+										disabled={!on && outIds.size >= 3}
+										class="{cls} transition hover:border-slate-500 disabled:opacity-40"
+									>
+										{on ? '✕ ' : ''}{p.name}
+										<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+									</button>
+								</form>
+							{:else}
+								<span class={cls}>
+									{on ? '✕ ' : ''}{p.name}
+									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+								</span>
+							{/if}
 						{/each}
 					</div>
 				</div>
@@ -138,31 +241,85 @@
 					<div class="flex flex-wrap gap-1.5">
 						{#each c.inbound as p (p.id)}
 							{@const on = inIds.has(p.id)}
-							<span
-								class="rounded-lg border px-2 py-1 text-xs {on
-									? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200'
-									: 'border-slate-700 bg-slate-800/60 text-slate-400'}"
-							>
-								{on ? '✓ ' : ''}{p.name}
-								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
-							</span>
+							{@const cls = `rounded-lg border px-2 py-1 text-xs ${on
+								? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200'
+								: 'border-slate-700 bg-slate-800/60 text-slate-400'}`}
+							{#if detail.live}
+								<form method="POST" action="?/toggleMustIn" use:enhance>
+									<input type="hidden" name="playerId" value={p.id} />
+									<button
+										type="submit"
+										disabled={!on && inIds.size >= 3}
+										class="{cls} transition hover:border-slate-500 disabled:opacity-40"
+									>
+										{on ? '✓ ' : ''}{p.name}
+										<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+									</button>
+								</form>
+							{:else}
+								<span class={cls}>
+									{on ? '✓ ' : ''}{p.name}
+									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+								</span>
+							{/if}
 						{:else}
-							<span class="text-xs text-slate-500">אין שחקנים ברשימת המחזור.</span>
+							<span class="text-xs text-slate-500">
+								אין שחקנים ברשימת המחזור.{#if detail.live}
+									<a href="/watchlist" class="underline">הוסף ב־/watchlist</a>{/if}
+							</span>
 						{/each}
 					</div>
 				</div>
 			</div>
 
-			<div class="grid gap-5 lg:grid-cols-3">
-				{#each detail.picks as p (p.strategy)}
-					<LineupCard
-						title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
-						badge={p.points != null ? `${p.points} נק׳` : 'טרם דורג'}
-						formation={p.formation ?? '—'}
-						stats={[{ label: 'הוצאה', value: `${p.spend ?? '—'} / 120`, tone: 'text-white' }]}
-						xi={p.xi}
-						bench={p.bench}
-					/>
+			<!-- One collapsible row per strategy; its 3 modes side by side from xl (≈ /options card width at full page width) -->
+			<div class="space-y-3">
+				{#each pickGroups as g (g.key)}
+					{@const open = isRowOpen(g.key)}
+					<div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
+						<button
+							type="button"
+							onclick={() => toggleRow(g.key)}
+							aria-expanded={open}
+							class="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-right hover:bg-slate-800/50"
+						>
+							<span class="flex items-center gap-2 text-xl font-bold text-slate-100">
+								<span class="inline-block h-3 w-3 rounded-full" style="background:{colorOf(g.key)}"></span>
+								{g.label}
+							</span>
+							<span class="flex items-center gap-2">
+								{#each g.picks as p (p.strategy)}
+									{#if p.points != null}
+										<span class="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
+											{p.modeLabel ? `${p.modeLabel} ` : ''}<span class="font-semibold text-white">{p.points}</span>
+										</span>
+									{/if}
+								{/each}
+								<span class="text-slate-500">{open ? '▾' : '▸'}</span>
+							</span>
+						</button>
+						{#if open}
+							<div class="grid grid-cols-1 gap-5 p-3 xl:grid-cols-3">
+								{#each g.picks as p (p.strategy)}
+									<LineupCard
+										title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
+										badge={p.points != null ? `${p.points} נק׳` : 'טרם דורג'}
+										formation={p.formation ?? '—'}
+										stats={[{ label: 'הוצאה', value: `${p.spend ?? '—'} / 120`, tone: 'text-white' }]}
+										xi={p.xi}
+										bench={p.bench}
+										out={p.out}
+										inn={p.in}
+										diffLabel={detail.baseFromGw != null
+											? `חילופים מול הקבוצה של מחזור ${detail.baseFromGw}`
+											: 'חילופים מול הקבוצה השמורה'}
+										actions={detail.live}
+										sketchButton={false}
+									/>
+								{/each}
+							</div>
+						{/if}
+					</div>
 				{/each}
 			</div>
 		</div>
@@ -176,7 +333,55 @@
 	{:else}
 		<!-- Leaderboard: every variant + your actual, ranked -->
 		<div class="overflow-x-auto rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
-			<h2 class="mb-2 text-sm font-semibold text-slate-300">דירוג — כל הגרסאות מול הבחירה שלך</h2>
+			<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+				<h2 class="text-sm font-semibold text-slate-300">
+					דירוג — כל הגרסאות מול הבחירה שלך
+					<span class="font-normal text-slate-500"
+						>· {boardView === 'total'
+							? `סה״כ ${scoredGws.length} ${scoredGws.length === 1 ? 'מחזור' : 'מחזורים'}`
+							: `מחזור ${boardGw}`}</span
+					>
+				</h2>
+				<div class="flex flex-wrap items-center gap-2">
+					<div class="flex gap-1">
+						<button
+							type="button"
+							onclick={() => (boardView = 'total')}
+							class="rounded-lg px-2.5 py-1 text-xs {boardView === 'total'
+								? 'bg-sky-500/20 text-sky-300'
+								: 'bg-slate-800 text-slate-400'}">סה״כ עונה</button
+						>
+						<button
+							type="button"
+							onclick={() => (boardView = 'gw')}
+							class="rounded-lg px-2.5 py-1 text-xs {boardView === 'gw'
+								? 'bg-sky-500/20 text-sky-300'
+								: 'bg-slate-800 text-slate-400'}">לפי מחזור</button
+						>
+					</div>
+					{#if boardView === 'gw'}
+						<div class="flex items-center gap-1">
+							<button
+								type="button"
+								disabled={boardPrev == null}
+								onclick={() => (boardGwPick = boardPrev)}
+								aria-label="מחזור קודם"
+								class="rounded-lg bg-slate-800 px-2 py-1 text-xs text-slate-200 disabled:bg-slate-900 disabled:text-slate-600"
+								>→</button
+							>
+							<span class="min-w-14 text-center text-xs text-slate-300">מחזור {boardGw}</span>
+							<button
+								type="button"
+								disabled={boardNext == null}
+								onclick={() => (boardGwPick = boardNext)}
+								aria-label="מחזור הבא"
+								class="rounded-lg bg-slate-800 px-2 py-1 text-xs text-slate-200 disabled:bg-slate-900 disabled:text-slate-600"
+								>←</button
+							>
+						</div>
+					{/if}
+				</div>
+			</div>
 			<table class="w-full min-w-[24rem] text-right text-sm">
 				<thead>
 					<tr class="text-slate-400">
@@ -189,8 +394,8 @@
 				</thead>
 				<tbody>
 					{#each leaderboard as s, i (s.key)}
-						{@const d = s.total - actualTotal}
-						<tr class="border-t border-slate-800 {s.key === st.leader ? 'bg-emerald-500/10' : ''}">
+						{@const d = boardPts(s) - boardActual}
+						<tr class="border-t border-slate-800 {s.key === boardLeader ? 'bg-emerald-500/10' : ''}">
 							<td class="py-1.5 pl-2 text-slate-500">{i + 1}</td>
 							<td class="py-1.5">
 								<span class="flex items-center gap-1.5">
@@ -205,7 +410,7 @@
 									<span class="text-[11px] text-slate-500">—</span>
 								{/if}
 							</td>
-							<td class="px-2 py-1.5 text-center font-semibold text-white">{s.total}</td>
+							<td class="px-2 py-1.5 text-center font-semibold text-white">{boardPts(s)}</td>
 							<td class="px-2 py-1.5 text-center">
 								{#if s.key === 'actual'}
 									<span class="text-[11px] text-slate-500">הבחירה שלך</span>
@@ -255,8 +460,28 @@
 						stroke-linejoin="round"
 						stroke-linecap="round"
 					/>
+				{/each}
+				{#each chartSeries as s (s.key)}
 					{#each s.perGw as p, i}
-						<circle cx={xFor(i)} cy={yFor(p.cumulative)} r="3" fill={colorOf(s.objective)} />
+						{@const v = Math.round(p.cumulative)}
+						{@const y = labelY.get(s.key)?.[i] ?? yFor(p.cumulative)}
+						{@const w = labelW(s.label, v)}
+						{@const x = labelX(xFor(i), w)}
+						<g>
+							<rect
+								x={x - w / 2}
+								y={y - LABEL_H / 2}
+								width={w}
+								height={LABEL_H}
+								rx="7"
+								fill={colorOf(s.objective)}
+								stroke="#0f172a"
+								stroke-width="1.5"
+							/>
+							<text x={x} y={y + 3.5} text-anchor="middle" direction="rtl" font-size="10" fill="#0f172a"
+								>{s.label} · <tspan font-weight="700">{v}</tspan></text
+							>
+						</g>
 					{/each}
 				{/each}
 			</svg>
