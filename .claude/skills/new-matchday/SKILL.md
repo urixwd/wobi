@@ -70,6 +70,24 @@ psql "$DB" -c "SELECT g.number, count(f.id) games, count(f.home_score) scored FR
 psql "$DB" -c "SELECT number, is_current FROM gameweeks WHERE is_current;"                       # is_current = P
 ```
 
+## Constraints: F locked, P open
+
+The planners ("must go out" / "must come in") are per matchday. After moving to P, confirm both sides:
+
+- **F is locked.** Its constraints were frozen into `final_squads[F]` (`must_in_ids` / `must_out_ids`) when Uri pressed «שמור קבוצה». `/strategies?gw=F` shows them read-only (no `toggleMust` forms in the HTML) with the planned counts, not (0).
+- **P is open.** `/strategies` defaults to P («מחזור פתוח — תצוגה חיה») with clickable chips (max 3 each); `/watchlist` has the same pickers. They save to `matchday_plan[P]`, which starts empty.
+
+```bash
+psql "$DB" -c "SELECT gameweek_number, must_in_ids, must_out_ids FROM final_squads WHERE gameweek_number=<F>;"   # row exists = F locked
+psql "$DB" -c "SELECT gameweek_number, must_in_ids, must_out_ids FROM matchday_plan WHERE gameweek_number=<P>;"  # P's plan (empty until picked)
+curl -s "http://localhost:5174/strategies?gw=<F>" | grep -c toggleMust   # 0 = read-only
+curl -s "http://localhost:5174/strategies" | grep -c toggleMust          # >0 = P selectable
+```
+
+- No `final_squads[F]` row → Uri never saved F's team; F's constraints aren't locked. Tell him; don't invent one.
+- F shows (0) though it was planned → constraints are checked against the latest `final_squads` **before** F, not live `my_squad`. Don't "fix" it by editing `my_squad` backwards.
+- P's must-in list comes from `watchlist_round[P]`, empty each new matchday — remind Uri to add players on `/watchlist`.
+
 ## Save + push (two commits)
 
 ```bash
@@ -86,7 +104,7 @@ Confirm `git status --short` shows nothing forbidden. Never commit `players.json
 ## Finish
 
 ```bash
-bun run dev
+sh dev/kill-ports.sh && sh dev/run.sh   # http://localhost:5174
 ```
 Start the dev server and report the URL.
 
@@ -96,3 +114,4 @@ Start the dev server and report the URL.
 - Run `db:import-fixtures` on a partial file.
 - Commit `.env`, `incoming/`, or any player JSON.
 - Delete previous gameweeks' snapshots — every round is kept.
+- Edit a finished matchday's constraints (`final_squads[F]`) — they're a permanent log.
