@@ -38,10 +38,10 @@ bun run db:push
 # או ייבוא JSON למחזור:
 # bun run db:import-players -- --gw=5 ./incoming/players-gw5.json
 bun run db:import-fixtures   # אופציונלי
-bun run dev
+sh dev/kill-ports.sh && sh dev/run.sh   # http://localhost:5174
 ```
 
-פתחו את הכתובת ש־Vite מדפיס (בדרך כלל http://localhost:5173).
+השרת רץ תמיד על http://localhost:5174 (`strictPort` ב־`vite.config.ts`). `dev/kill-ports.sh` משחרר רק את הפורט הזה.
 
 ## סקריפטים
 
