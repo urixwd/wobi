@@ -1,5 +1,5 @@
 -- WOBI Postgres dump
--- generated: 2026-10-08T19:34:00.274Z
+-- generated: 2026-10-08T20:17:51.213Z
 -- source: DATABASE_URL (credentials redacted)
 -- restore: psql "$DATABASE_URL" -f db/dumps/latest.sql
 
@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GLOaEusa74w9kWy8tgDCA9yJ02pm3UhqS5UJVdKZpncSeILIUnY6BhbUwmedVq0
+\restrict e4miEDCXJI1Syss2gVCwcXXZyGMxRIhkdfLdmBJpIfaGvVSCPeCZmGBO0eq00CK
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -848,6 +848,7 @@ COPY public.gameweeks (id, number, label, is_current, starts_at, ends_at) FROM s
 --
 
 COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at, must_out_ids) FROM stdin;
+14	6	[]	2026-10-08 22:17:44.489+02	[]
 7	5	[3474]	2026-09-18 14:08:39.829+02	[3699, 2732]
 \.
 
@@ -3520,6 +3521,8 @@ COPY public.watchlist_permanent (id, player_id, notes, created_at) FROM stdin;
 25	3743	\N	2026-09-18 12:18:13.879561+02
 26	2902	\N	2026-09-18 12:18:51.245632+02
 27	464	\N	2026-09-18 12:36:55.221095+02
+28	7292	\N	2026-10-08 21:42:35.208368+02
+29	7274	\N	2026-10-08 22:10:40.129287+02
 \.
 
 
@@ -3528,16 +3531,25 @@ COPY public.watchlist_permanent (id, player_id, notes, created_at) FROM stdin;
 --
 
 COPY public.watchlist_round (id, player_id, gameweek_number, notes, created_at) FROM stdin;
-33	824	5	\N	2026-09-18 11:46:50.164836+02
-34	3474	5	\N	2026-09-18 11:46:51.122814+02
-37	6681	5	\N	2026-09-18 11:46:54.652057+02
-38	522	5	\N	2026-09-18 11:46:55.153881+02
-43	7257	5	\N	2026-09-18 11:48:14.366472+02
-44	493	5	\N	2026-09-18 11:48:19.675245+02
-46	6630	5	\N	2026-09-18 11:55:59.525785+02
-47	2902	5	\N	2026-09-18 12:18:49.685785+02
 48	424	5	\N	2026-09-18 12:22:24.834144+02
-49	464	5	\N	2026-09-18 12:36:53.661866+02
+50	7274	6	\N	2026-10-08 21:41:56.537249+02
+51	7292	6	\N	2026-10-08 22:02:33.094229+02
+43	7257	6	\N	2026-09-18 11:48:14.366472+02
+33	824	6	\N	2026-09-18 11:46:50.164836+02
+46	6630	6	\N	2026-09-18 11:55:59.525785+02
+34	3474	6	\N	2026-09-18 11:46:51.122814+02
+56	521	6	\N	2026-10-08 22:03:04.939122+02
+44	493	6	\N	2026-09-18 11:48:19.675245+02
+58	4635	6	\N	2026-10-08 22:03:08.413925+02
+59	1859	6	\N	2026-10-08 22:03:09.118603+02
+60	3488	6	\N	2026-10-08 22:03:10.761701+02
+37	6681	6	\N	2026-09-18 11:46:54.652057+02
+62	6669	6	\N	2026-10-08 22:03:13.407904+02
+47	2902	6	\N	2026-09-18 12:18:49.685785+02
+49	464	6	\N	2026-09-18 12:36:53.661866+02
+65	3743	6	\N	2026-10-08 22:03:16.334708+02
+38	522	6	\N	2026-09-18 11:46:55.153881+02
+67	6587	6	\N	2026-10-08 22:03:19.02568+02
 \.
 
 
@@ -3566,7 +3578,7 @@ SELECT pg_catalog.setval('public.gameweeks_id_seq', 80, true);
 -- Name: matchday_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.matchday_plan_id_seq', 13, true);
+SELECT pg_catalog.setval('public.matchday_plan_id_seq', 59, true);
 
 
 --
@@ -3608,14 +3620,14 @@ SELECT pg_catalog.setval('public.strategy_picks_id_seq', 57, true);
 -- Name: watchlist_permanent_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.watchlist_permanent_id_seq', 27, true);
+SELECT pg_catalog.setval('public.watchlist_permanent_id_seq', 29, true);
 
 
 --
 -- Name: watchlist_round_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.watchlist_round_id_seq', 49, true);
+SELECT pg_catalog.setval('public.watchlist_round_id_seq', 67, true);
 
 
 --
@@ -3855,5 +3867,5 @@ ALTER TABLE ONLY public.watchlist_round
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GLOaEusa74w9kWy8tgDCA9yJ02pm3UhqS5UJVdKZpncSeILIUnY6BhbUwmedVq0
+\unrestrict e4miEDCXJI1Syss2gVCwcXXZyGMxRIhkdfLdmBJpIfaGvVSCPeCZmGBO0eq00CK
 
