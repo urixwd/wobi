@@ -18,6 +18,7 @@ import { createDb } from '../src/lib/server/db/client';
 import { playerRoundStats, playerSnapshots, players, teams } from '../src/lib/server/db/schema';
 import { difficultyForTeamName } from '../src/lib/difficulty';
 import { ensureLocalLogo } from './lib/assetLocalize';
+import { seasonPoints } from '../src/lib/stats';
 
 type RawPlayer = {
 	id: number;
@@ -217,7 +218,6 @@ async function main() {
 					| {
 							roundId?: number;
 							points?: number;
-							seasonPoints?: number;
 							statsData?: unknown;
 					  }
 					| null
@@ -225,9 +225,8 @@ async function main() {
 				if (lr && Number.isFinite(Number(lr.roundId))) {
 					const sport5RoundId = Number(lr.roundId);
 					const points = Number(lr.points ?? 0) || 0;
-					const seasonPts = Number.isFinite(Number(lr.seasonPoints))
-						? Number(lr.seasonPoints)
-						: null;
+					// Season total = lastSeasonPlayerStats.points (lr.seasonPoints isn't a running total).
+					const seasonPts = seasonPoints(p);
 					let statsData: unknown = lr.statsData ?? null;
 					if (typeof statsData === 'string') {
 						try {

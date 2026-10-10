@@ -35,10 +35,12 @@ export function lastRoundPoints(p: Statsish): number | null {
 	return Number.isFinite(n) ? n : null;
 }
 
-/** Season points accumulated so far (Dream Team). */
+/**
+ * Season points accumulated so far (Dream Team) — Sport5's `lastSeasonPlayerStats.points`
+ * (despite the name it's the current season; it grows by exactly each round's points).
+ * Not `lastRoundPlayerStats.seasonPoints`: that field isn't a running total.
+ */
 export function seasonPoints(p: Statsish): number | null {
-	const round = p.lastRoundPlayerStats as RoundStats | null;
-	if (round && Number.isFinite(Number(round.seasonPoints))) return Number(round.seasonPoints);
 	const season = p.lastSeasonPlayerStats as RoundStats | null;
 	if (!season) return null;
 	const n = Number(season.points ?? season.totalPoints);
