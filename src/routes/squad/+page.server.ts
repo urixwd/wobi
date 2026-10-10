@@ -13,6 +13,7 @@ import {
 } from '$lib/server/upcomingFixtures';
 import type { Actions, PageServerLoad } from './$types';
 import { getPointsHistory } from '$lib/server/playerHistory';
+import { getBaseSquad } from '$lib/server/strategyTracking';
 
 async function getOrCreateSquad() {
 	const existing = await db.select().from(mySquad).limit(1);
@@ -123,10 +124,14 @@ export const load: PageServerLoad = async ({ url }) => {
 	});
 
 	const history = await getPointsHistory();
+	// Transfers this matchday count against the previous matchday's official team.
+	const transferBase = await getBaseSquad(currentGw);
 
 	return {
 		squad,
 		allPlayers,
+		/** Previous matchday's official squad (ids + its matchday) — baseline for «חילופים עד כה». */
+		transferBase,
 		/** Per-matchday points (newest first) for the player panel. */
 		historyMatchdays: history.matchdays,
 		history: Object.fromEntries(history.byPlayer),

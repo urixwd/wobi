@@ -108,8 +108,9 @@
 	const historyOf = (id: number) =>
 		data.history[id] ?? data.historyMatchdays.map((md) => ({ matchday: md, played: false as const }));
 
+	/** Transfers for this matchday: vs the previous matchday's official team (not the last save). */
 	const transferSummary = $derived.by(() => {
-		const saved = new Set([...savedXi, ...savedBench]);
+		const saved = new Set(data.transferBase.ids);
 		const current = new Set([...xi, ...bench]);
 		const outIds = [...saved].filter((id) => !current.has(id));
 		const inIds = [...current].filter((id) => !saved.has(id));
@@ -777,7 +778,8 @@
 							<span class="text-[10px] font-medium uppercase tracking-wide text-white/50"
 								>{row.label}</span
 							>
-							<div class="relative flex w-full min-h-[5.5rem] items-center justify-center px-9">
+							<!-- px-6 / gap-1: room for 5 cards (5rem) in a row; the + only shows when a row has space -->
+							<div class="relative flex w-full min-h-[5.5rem] items-center justify-center px-6">
 								{#if canAddPosition(row.pos)}
 									<button
 										type="button"
@@ -787,7 +789,7 @@
 									>+</button
 									>
 								{/if}
-								<div class="flex flex-wrap items-start justify-center gap-2">
+								<div class="flex flex-wrap items-start justify-center gap-1">
 									{#each rowPlayers as r}
 									<!-- hover:z lifts the card (it has its own stacking context via backdrop-blur) so its fixture popover sits above later cards -->
 									<div class="relative hover:z-[95]" class:z-[90]={openStatsId === r.player.id}>
@@ -976,9 +978,16 @@
 
 			<!-- Transfer summary vs last saved squad -->
 			<div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
-				<h2 class="mb-2 font-semibold text-amber-200">חילופים עד כה</h2>
+				<h2 class="mb-2 font-semibold text-amber-200">
+					חילופים עד כה
+					{#if data.transferBase.fromGw != null}
+						<span class="text-xs font-normal text-slate-400">· מול הקבוצה של מחזור {data.transferBase.fromGw}</span>
+					{/if}
+				</h2>
 				{#if transferSummary.out.length === 0 && transferSummary.in.length === 0}
-					<p class="text-xs text-slate-500">אין חילופים מול ההרכב השמור</p>
+					<p class="text-xs text-slate-500">
+						אין חילופים מול {data.transferBase.fromGw != null ? `הקבוצה של מחזור ${data.transferBase.fromGw}` : 'ההרכב השמור'}
+					</p>
 				{:else}
 					<div class="grid gap-3 sm:grid-cols-2">
 						<div>
