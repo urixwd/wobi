@@ -980,7 +980,7 @@
 									<li class="flex items-center justify-between gap-2 rounded-lg bg-red-500/10 px-2 py-1 text-xs">
 										<span class="truncate font-medium">{r.player.name}</span>
 										<span class="shrink-0 text-slate-400"
-											>{positionLabel(r.player.position)} · {formatPrice(r.player.price)}</span
+											>{seasonPoints(r.player) ?? 0} נק׳ · {formatPrice(r.player.price)}</span
 										>
 									</li>
 								{:else}
@@ -995,7 +995,7 @@
 									<li class="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 px-2 py-1 text-xs">
 										<span class="truncate font-medium">{r.player.name}</span>
 										<span class="shrink-0 text-slate-400"
-											>{positionLabel(r.player.position)} · {formatPrice(r.player.price)}</span
+											>{seasonPoints(r.player) ?? 0} נק׳ · {formatPrice(r.player.price)}</span
 										>
 									</li>
 								{:else}
