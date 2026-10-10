@@ -436,6 +436,16 @@ export type PendingPick = {
 	/** Transfers vs. the team the matchday started from (see `baseFromGw`). */
 	out: ConstraintPlayer[];
 	in: ConstraintPlayer[];
+	/** XI metrics from current player data — open matchday only (past ones would be anachronistic). */
+	metrics: PickMetrics | null;
+};
+export type PickMetrics = {
+	remaining: number;
+	points: number;
+	vlfm: number;
+	matchdayEase: number;
+	fixtureEase5: number;
+	form: number;
 };
 export type ConstraintPlayer = { id: number; name: string; position: number };
 export type PendingConstraints = {
@@ -525,7 +535,8 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 			xi: hydrate(p.xiPlayerIds),
 			bench: hydrate(p.benchPlayerIds),
 			out: [],
-			in: []
+			in: [],
+			metrics: null
 		};
 	});
 	list.sort((a, b) => {
@@ -552,6 +563,26 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 			.map((p) => ({ id: p.id, name: p.name, position: p.position }));
 		pk.out.sort((a, b) => a.position - b.position);
 		pk.in.sort((a, b) => a.position - b.position);
+	}
+
+	// Same XI metrics the transfer engine optimises (see makeCombo), for the open matchday.
+	if (live) {
+		const allIds = [...new Set(list.flatMap((pk) => [...pk.xi, ...pk.bench].map((p) => p.id)))];
+		const tById = new Map((await buildTransferInputs(gw, allIds)).base.map((p) => [p.id, p]));
+		for (const pk of list) {
+			const xi = pk.xi.map((p) => tById.get(p.id)).filter(Boolean) as TPlayer[];
+			if (!xi.length) continue;
+			const avg = (f: (p: TPlayer) => number) => xi.reduce((s, p) => s + f(p), 0) / xi.length;
+			const spend = [...pk.xi, ...pk.bench].reduce((s, p) => s + p.price, 0);
+			pk.metrics = {
+				remaining: Math.round((120 - spend) * 10) / 10,
+				points: xi.reduce((s, p) => s + p.points, 0),
+				vlfm: avg((p) => p.vlfm),
+				matchdayEase: avg((p) => p.matchdayEase),
+				fixtureEase5: avg((p) => p.fixtureEase5),
+				form: xi.reduce((s, p) => s + p.form, 0)
+			};
+		}
 	}
 	const inbound = wishlist.filter((p) => !baseIdSet.has(p.id));
 	const inboundSet = new Set(inbound.map((p) => p.id));

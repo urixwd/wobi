@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import LineupCard from '$lib/components/LineupCard.svelte';
-	import type { PageData } from './$types';
+	import type { ActionData, PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const st = $derived(data.standings);
 	const detail = $derived(data.detail);
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
@@ -28,6 +28,23 @@
 		mode === 'out' ? '6 3' : mode === 'free' ? '2 3' : undefined; // constrained & actual: solid
 	const fmtDelta = (d: number) => (d > 0 ? `+${d}` : `${d}`);
 
+	/** How each strategy picks its lineup (mirrors matchdayTransfers.ts SCORE / COMBO_METRIC). */
+	const HOW: Record<string, string> = {
+		actual:
+			'הקבוצה ששמרת בפועל ב־/squad למחזור הזה (במחזור פתוח: הקבוצה השמורה כרגע). כל השיטות נמדדות מולה. הניקוד: נקודות האמת של ה־XI במחזור, כולל חילוף אוטומטי מהספסל לשחקן שלא שיחק, בלי הכפלת קפטן.',
+		points:
+			'סכום נקודות העונה של 11 השחקנים בהרכב. נבחרים החילופים וההרכב עם הסכום הגבוה ביותר.',
+		vlfm:
+			'vlfm = נקודות עונה ÷ מחיר (נקודות לכל מיליון). נבחר ההרכב שבו ממוצע ה־vlfm של 11 השחקנים הכי גבוה; בשוויון — יותר נקודות עונה.',
+		fixtures:
+			'כל שחקן מקבל ציון לפי קושי המשחק של הקבוצה שלו במחזור הזה: ירוק +3, צהוב +1, אדום −2. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
+		fixtures5:
+			'אותו ציון (ירוק +3, צהוב +1, אדום −2), בממוצע על עד 5 המשחקים הקרובים של כל שחקן. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
+		form: 'סכום הנקודות ש־11 השחקנים צברו במחזור האחרון בלבד. נבחר ההרכב עם הסכום הגבוה ביותר; בשוויון — יותר נקודות עונה.'
+	};
+	const HOW_COMMON =
+		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה.';
+
 	const MODE_TABS = [
 		{ key: 'constrained', label: 'מוגבל' },
 		{ key: 'out', label: 'יציאה בלבד' },
@@ -36,6 +53,26 @@
 	let selectedMode = $state('constrained');
 	// Chart shows one mode at a time (+ your actual), to stay legible.
 	const chartSeries = $derived(st.series.filter((s) => s.key === 'actual' || s.mode === selectedMode));
+
+	/** Card stats + the objective's own score, as /watchlist showed them. */
+	type Metrics = NonNullable<NonNullable<typeof detail>['picks'][number]['metrics']>;
+	const objScore: Record<string, (m: Metrics) => string> = {
+		points: (m) => `${m.points} נק׳ עונה ב־XI`,
+		vlfm: (m) => `vlfm ממוצע ${m.vlfm.toFixed(2)}`,
+		fixtures: (m) => `קלות לוח מחזור ${m.matchdayEase.toFixed(2)}`,
+		fixtures5: (m) => `קלות לוח 5 מחזורים ${m.fixtureEase5.toFixed(2)}`,
+		form: (m) => `${m.form} נק׳ במחזור האחרון`
+	};
+	function cardStats(spend: number | null, m: Metrics | null) {
+		const stats = [{ label: 'הוצאה', value: `${spend ?? '—'} / 120`, tone: 'text-white' }];
+		if (m)
+			stats.push(
+				{ label: 'פנוי', value: `${m.remaining}`, tone: 'text-emerald-300' },
+				{ label: 'נק׳ הרכב', value: `${m.points}`, tone: 'text-sky-300' },
+				{ label: 'vlfm', value: m.vlfm.toFixed(2), tone: 'text-violet-300' }
+			);
+		return stats;
+	}
 
 	// Lineups grouped by strategy (one collapsible row each), in the server's order.
 	const pickGroups = $derived.by(() => {
@@ -162,6 +199,13 @@
 		</p>
 	</div>
 
+	{#if form?.sketchSaved}
+		<div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
+			סקיצה נשמרה למחזור {form.sketchGw} ✓ ·
+			<a class="underline" href="/sketches?gw={form.sketchGw}">לסקיצות</a>
+		</div>
+	{/if}
+
 	{#if detail}
 		{@const c = detail.constraints}
 		{@const outIds = new Set(c.forcedOut)}
@@ -283,9 +327,11 @@
 							aria-expanded={open}
 							class="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-right hover:bg-slate-800/50"
 						>
-							<span class="flex items-center gap-2 text-xl font-bold text-slate-100">
-								<span class="inline-block h-3 w-3 rounded-full" style="background:{colorOf(g.key)}"></span>
-								{g.label}
+							<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<span class="flex items-center gap-2 text-xl font-bold text-slate-100">
+									<span class="inline-block h-3 w-3 rounded-full" style="background:{colorOf(g.key)}"></span>
+									{g.label}
+								</span>
 							</span>
 							<span class="flex items-center gap-2">
 								{#each g.picks as p (p.strategy)}
@@ -299,13 +345,21 @@
 							</span>
 						</button>
 						{#if open}
+							{#if HOW[g.key]}
+								<div class="mx-3 mt-3 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-xs leading-relaxed text-slate-300">
+									<span class="font-semibold text-slate-200">איך זה מחושב:</span>
+									{HOW[g.key]}
+									{#if g.key !== 'actual'}<span class="block pt-1 text-slate-500">{HOW_COMMON}</span>{/if}
+								</div>
+							{/if}
 							<div class="grid grid-cols-1 gap-5 p-3 xl:grid-cols-3">
 								{#each g.picks as p (p.strategy)}
 									<LineupCard
 										title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
 										badge={p.points != null ? `${p.points} נק׳` : 'טרם דורג'}
 										formation={p.formation ?? '—'}
-										stats={[{ label: 'הוצאה', value: `${p.spend ?? '—'} / 120`, tone: 'text-white' }]}
+										subtitle={p.metrics && objScore[p.objective] ? objScore[p.objective](p.metrics) : null}
+										stats={cardStats(p.spend, p.metrics)}
 										xi={p.xi}
 										bench={p.bench}
 										out={p.out}
@@ -314,7 +368,8 @@
 											? `חילופים מול הקבוצה של מחזור ${detail.baseFromGw}`
 											: 'חילופים מול הקבוצה השמורה'}
 										actions={detail.live}
-										sketchButton={false}
+										sketchName={`${p.label}${p.modeLabel ? ` · ${p.modeLabel}` : ''} · מחזור ${detail.gameweekNumber}`}
+										gameweekNumber={detail.gameweekNumber}
 									/>
 								{/each}
 							</div>

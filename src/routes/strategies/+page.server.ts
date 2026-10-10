@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { gameweeks as gameweeksTable } from '$lib/server/db/schema';
+import { gameweeks as gameweeksTable, sketches } from '$lib/server/db/schema';
 import {
 	getStandings,
 	getMatchdayDetail,
@@ -39,9 +39,34 @@ async function toggle(kind: 'in' | 'out', request: Request) {
 	return { success: true };
 }
 
+function parseIdList(raw: FormDataEntryValue | null): number[] {
+	return String(raw ?? '')
+		.split(',')
+		.map((s) => Number(s.trim()))
+		.filter((n) => Number.isFinite(n) && n > 0);
+}
+
 export const actions: Actions = {
 	toggleMustIn: ({ request }) => toggle('in', request),
 	toggleMustOut: ({ request }) => toggle('out', request),
+	/** Save a strategy's lineup as a sketch (same as /watchlist, /squad). */
+	saveSketch: async ({ request }) => {
+		const form = await request.formData();
+		const xi = parseIdList(form.get('xi'));
+		const bench = parseIdList(form.get('bench'));
+		const name = String(form.get('sketchName') ?? '').trim() || 'סקיצה';
+		const gw = Number(form.get('gameweekNumber'));
+		const gameweekNumber =
+			Number.isFinite(gw) && gw > 0 ? Math.trunc(gw) : await resolveCurrentGwNumber(4);
+
+		if (xi.length + bench.length === 0) return fail(400, { message: 'אי אפשר לשמור סקיצה ריקה' });
+		if (new Set([...xi, ...bench]).size !== xi.length + bench.length) {
+			return fail(400, { message: 'שחקן לא יכול להיות גם ב־XI וגם בספסל' });
+		}
+
+		await db.insert(sketches).values({ name, gameweekNumber, xiPlayerIds: xi, benchPlayerIds: bench });
+		return { success: true, sketchSaved: true, sketchGw: gameweekNumber };
+	},
 	/** Stage a pick on /squad (same as /options) — my_squad only changes on «שמור קבוצה». */
 	apply: async ({ request }) => {
 		const form = await request.formData();
