@@ -47,7 +47,7 @@
 	</div>
 {:else}
 	<div
-		class="w-[5.5rem] rounded-lg border border-slate-600/60 bg-slate-900/90 px-1.5 py-1 text-center"
+		class="w-[5rem] rounded-lg border border-slate-600/60 bg-slate-900/90 px-1 py-1 text-center"
 	>
 		<div class="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white">
 			{#if logo}
@@ -60,7 +60,7 @@
 		<div class="text-[10px] text-amber-200/90">{formatPrice(price)}</div>
 		<div class="text-[10px] text-sky-300/90">{points} נק׳</div>
 		<div class="mt-0.5 flex justify-center">
-			<FixtureStrip fixtures={upcomingFixtures} {position} size="sm" />
+			<FixtureStrip fixtures={upcomingFixtures} {position} size="sm" stacked />
 		</div>
 	</div>
 {/if}

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import FlashLabel from '$lib/components/FlashLabel.svelte';
+	import { Flash } from '$lib/flash.svelte';
 	import PriceRangeSlider from '$lib/components/PriceRangeSlider.svelte';
 	import PlayerStatsPanel from '$lib/components/PlayerStatsPanel.svelte';
 	import { positionLabel } from '$lib/positions';
@@ -392,6 +394,9 @@
 		else statsPanelPos = null; // pitch cards keep relative panels; clear fixed
 	}
 
+	/** ✓ on the save button that just succeeded. */
+	const saveFlash = new Flash();
+
 	/** Bench player waiting for «who comes out?» (outfield, several XI candidates). */
 	let subBenchId = $state<number | null>(null);
 	const subCandidates = $derived(
@@ -653,10 +658,13 @@
 	<form
 		method="POST"
 		action="?/save"
-		use:enhance={() => {
+		use:enhance={({ submitter }) => {
 			return async ({ result, update }) => {
 				await update();
-				if (result.type === 'success') {
+				const isSketch = submitter?.getAttribute('formaction') === '?/saveSketch';
+				if (result.type === 'success') saveFlash.trigger(isSketch ? 'sketch' : 'save');
+				// Only «שמור קבוצה» moves the transfer baseline; a sketch leaves the saved team as is.
+				if (result.type === 'success' && !isSketch) {
 					savedXi = [...xi];
 					savedBench = [...bench];
 					// drop staged query params after persist
@@ -686,14 +694,14 @@
 				type="submit"
 				class="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
 			>
-				שמור קבוצה
+				<FlashLabel label="שמור קבוצה" done={saveFlash.is('save')} />
 			</button>
 			<button
 				type="submit"
 				formaction="?/saveSketch"
 				class="rounded-xl border border-emerald-400/60 bg-slate-900 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-slate-800"
 			>
-				שמור כסקיצה
+				<FlashLabel label="שמור כסקיצה" done={saveFlash.is('sketch')} />
 			</button>
 			<input type="hidden" name="gameweekNumber" value={data.currentGw} />
 			<input type="hidden" name="sketchName" value="סקיצה מחזור {data.currentGw}" />
@@ -792,7 +800,7 @@
 										<button
 											type="button"
 											draggable="true"
-											class="group flex w-[6.5rem] cursor-grab flex-col items-center overflow-visible rounded-xl border border-white/10 bg-slate-950/75 px-1 py-1.5 text-center shadow-lg backdrop-blur-sm transition hover:border-emerald-400/50 active:cursor-grabbing"
+											class="group flex w-[5rem] cursor-grab flex-col items-center overflow-visible rounded-xl border border-white/10 bg-slate-950/75 px-1 py-1.5 text-center shadow-lg backdrop-blur-sm transition hover:border-emerald-400/50 active:cursor-grabbing"
 											onclick={() => toggleStats(r.player.id)}
 											ondragstart={(e) => onDragStart(e, r.player.id)}
 											ondragend={onDragEnd}
@@ -826,7 +834,13 @@
 												<span class="rounded px-1 py-0.5 text-[9px] {d.className}">{d.label}</span>
 											{/if}
 											<div class="mt-1 w-full overflow-visible">
-												<FixtureStrip fixtures={r.upcomingFixtures ?? []} slots={5} position={r.player.position} />
+												<FixtureStrip
+													fixtures={r.upcomingFixtures ?? []}
+													slots={5}
+													position={r.player.position}
+													stacked
+													focusable={false}
+												/>
 											</div>
 										</button>
 										{#if openStatsId === r.player.id}
@@ -894,7 +908,7 @@
 								<button
 									type="button"
 									draggable="true"
-									class="flex w-[6.5rem] cursor-grab flex-col items-center rounded-xl border border-slate-700 bg-slate-950/80 px-1.5 py-1.5 hover:border-emerald-400/50 active:cursor-grabbing"
+									class="flex w-[5rem] cursor-grab flex-col items-center rounded-xl border border-slate-700 bg-slate-950/80 px-1 py-1.5 hover:border-emerald-400/50 active:cursor-grabbing"
 									onclick={() => toggleStats(r.player.id)}
 									ondragstart={(e) => onDragStart(e, r.player.id)}
 									ondragend={onDragEnd}
@@ -916,7 +930,12 @@
 										>{formatPointsLabel(r.player)}</span
 									>
 									<div class="mt-0.5 w-full overflow-visible">
-										<FixtureStrip fixtures={r.upcomingFixtures ?? []} position={r.player.position} />
+										<FixtureStrip
+											fixtures={r.upcomingFixtures ?? []}
+											position={r.player.position}
+											stacked
+											focusable={false}
+										/>
 									</div>
 								</button>
 								{#if openStatsId === r.player.id}
@@ -934,7 +953,7 @@
 						{:else}
 							<button
 								type="button"
-								class="flex h-[7.5rem] w-[6.5rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-950/40 transition hover:border-emerald-400/60 hover:bg-slate-900/80"
+								class="flex h-[7.5rem] w-[5rem] flex-col items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-950/40 transition hover:border-emerald-400/60 hover:bg-slate-900/80"
 								title="סנן לפי {slot.label}"
 								onclick={() => filterByPosition(slot.pos)}
 							>
