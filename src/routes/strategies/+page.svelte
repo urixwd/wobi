@@ -20,6 +20,7 @@
 		points: '#38bdf8',
 		vlfm: '#a78bfa',
 		fixtures: '#fbbf24',
+		fixtures3: '#a3e635',
 		fixtures5: '#2dd4bf',
 		form: '#fb7185'
 	};
@@ -37,13 +38,15 @@
 		vlfm:
 			'vlfm = נקודות עונה ÷ מחיר (נקודות לכל מיליון). נבחר ההרכב שבו ממוצע ה־vlfm של 11 השחקנים הכי גבוה; בשוויון — יותר נקודות עונה.',
 		fixtures:
-			'כל שחקן מקבל ציון לפי קושי המשחק של הקבוצה שלו במחזור הזה: ירוק +3, צהוב +1, אדום −2. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
+			'כל שחקן מקבל ציון לפי קושי המשחק של הקבוצה שלו במחזור הזה, לפי העמדה שלו: ירוק +3, צהוב +1, אדום −2. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
+		fixtures3:
+			'אותו ציון (ירוק +3, צהוב +1, אדום −2, לפי העמדה של השחקן), בממוצע על עד 3 המשחקים הקרובים של כל שחקן. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
 		fixtures5:
-			'אותו ציון (ירוק +3, צהוב +1, אדום −2), בממוצע על עד 5 המשחקים הקרובים של כל שחקן. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
+			'אותו ציון (ירוק +3, צהוב +1, אדום −2, לפי העמדה של השחקן), בממוצע על עד 5 המשחקים הקרובים של כל שחקן. נבחר ההרכב עם הממוצע הגבוה ביותר של 11 השחקנים; בשוויון — יותר נקודות עונה.',
 		form: 'סכום הנקודות ש־11 השחקנים צברו במחזור האחרון בלבד. נבחר ההרכב עם הסכום הגבוה ביותר; בשוויון — יותר נקודות עונה.'
 	};
 	const HOW_COMMON =
-		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה.';
+		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה. בשיטות הלוח, קושי היריב תלוי בעמדת השחקן — שוער והגנה מול התקפת היריב, קישור והתקפה מול הגנת היריב — ונקבע לכל מחזור ב־/difficulty.';
 
 	const MODE_TABS = [
 		{ key: 'constrained', label: 'מוגבל' },
@@ -60,6 +63,7 @@
 		points: (m) => `${m.points} נק׳ עונה ב־XI`,
 		vlfm: (m) => `vlfm ממוצע ${m.vlfm.toFixed(2)}`,
 		fixtures: (m) => `קלות לוח מחזור ${m.matchdayEase.toFixed(2)}`,
+		fixtures3: (m) => `קלות לוח 3 מחזורים ${m.fixtureEase3.toFixed(2)}`,
 		fixtures5: (m) => `קלות לוח 5 מחזורים ${m.fixtureEase5.toFixed(2)}`,
 		form: (m) => `${m.form} נק׳ במחזור האחרון`
 	};
@@ -120,13 +124,24 @@
 	const boardGwIdx = $derived(boardGw != null ? scoredGws.indexOf(boardGw) : -1);
 	const boardPrev = $derived(boardGwIdx > 0 ? scoredGws[boardGwIdx - 1] : null);
 	const boardNext = $derived(boardGwIdx >= 0 && boardGwIdx < scoredGws.length - 1 ? scoredGws[boardGwIdx + 1] : null);
-	const boardPts = (s: (typeof st.series)[number]) =>
-		boardView === 'total' ? s.total : (s.perGw.find((p) => p.gw === boardGw)?.points ?? 0);
-	const leaderboard = $derived([...st.series].sort((a, b) => boardPts(b) - boardPts(a)));
-	const boardActual = $derived.by(() => {
-		const a = st.series.find((s) => s.key === 'actual');
-		return a ? boardPts(a) : 0;
-	});
+	type Series = (typeof st.series)[number];
+	/** null = the series has no pick for that matchday (e.g. a strategy added later) — not 0. */
+	const boardPts = (s: Series): number | null =>
+		boardView === 'total' ? s.total : (s.perGw.find((p) => p.gw === boardGw)?.points ?? null);
+	const leaderboard = $derived(
+		[...st.series].sort((a, b) => (boardPts(b) ?? -Infinity) - (boardPts(a) ?? -Infinity))
+	);
+	const actualSeries = $derived(st.series.find((s) => s.key === 'actual') ?? null);
+	/**
+	 * Your actual points over the same matchdays `s` has data for, so a strategy
+	 * that started later is compared fairly (only on common matchdays).
+	 */
+	const actualOver = (s: Series): number => {
+		if (!actualSeries) return 0;
+		if (boardView === 'gw') return actualSeries.perGw.find((p) => p.gw === boardGw)?.points ?? 0;
+		const has = new Set(s.perGw.filter((p) => p.points != null).map((p) => p.gw));
+		return actualSeries.perGw.reduce((sum, p) => sum + (has.has(p.gw) ? (p.points ?? 0) : 0), 0);
+	};
 	const boardLeader = $derived(leaderboard[0]?.key ?? null);
 
 	// Chart geometry (viewBox units).
@@ -139,7 +154,9 @@
 	const plotW = W - padL - padR;
 	const plotH = H - padT - padB;
 	const gws = $derived(st.gameweeks);
-	const maxY = $derived(Math.max(1, ...chartSeries.flatMap((s) => s.perGw.map((p) => p.cumulative))));
+	const maxY = $derived(
+		Math.max(1, ...chartSeries.flatMap((s) => s.perGw.map((p) => p.cumulative ?? 0)))
+	);
 
 	function niceStep(raw: number): number {
 		const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, raw))));
@@ -158,8 +175,12 @@
 	const xFor = (i: number) =>
 		gws.length <= 1 ? padL + plotW / 2 : padL + padX + (i / (gws.length - 1)) * (plotW - 2 * padX);
 	const yFor = (v: number) => padT + plotH - (v / maxY) * plotH;
-	const linePoints = (perGw: { cumulative: number }[]) =>
-		perGw.map((p, i) => `${xFor(i)},${yFor(p.cumulative)}`).join(' ');
+	// Matchdays without data are skipped, so a later-added strategy's line starts where its data does.
+	const linePoints = (perGw: { cumulative: number | null }[]) =>
+		perGw
+			.map((p, i) => (p.cumulative == null ? null : `${xFor(i)},${yFor(p.cumulative)}`))
+			.filter(Boolean)
+			.join(' ');
 
 	// Value labels: per matchday, stack labels that would overlap (sorted by y, min gap apart).
 	const LABEL_H = 15;
@@ -173,8 +194,8 @@
 		for (const s of chartSeries) out.set(s.key, []);
 		gws.forEach((_, i) => {
 			const col = chartSeries
-				.filter((s) => s.perGw[i])
-				.map((s) => ({ key: s.key, y: yFor(s.perGw[i].cumulative) }))
+				.filter((s) => s.perGw[i]?.cumulative != null)
+				.map((s) => ({ key: s.key, y: yFor(s.perGw[i].cumulative ?? 0) }))
 				.sort((a, b) => a.y - b.y);
 			const step = LABEL_H + LABEL_GAP;
 			for (let j = 1; j < col.length; j++) col[j].y = Math.max(col[j].y, col[j - 1].y + step);
@@ -449,13 +470,21 @@
 				</thead>
 				<tbody>
 					{#each leaderboard as s, i (s.key)}
-						{@const d = boardPts(s) - boardActual}
+						{@const pts = boardPts(s)}
+						{@const d = pts == null ? null : pts - actualOver(s)}
 						<tr class="border-t border-slate-800 {s.key === boardLeader ? 'bg-emerald-500/10' : ''}">
 							<td class="py-1.5 pl-2 text-slate-500">{i + 1}</td>
 							<td class="py-1.5">
 								<span class="flex items-center gap-1.5">
 									<span class="inline-block h-2.5 w-2.5 rounded-full" style="background:{colorOf(s.objective)}"></span>
 									<span class="text-slate-200">{s.label}</span>
+									{#if boardView === 'total' && s.partial && s.fromGw != null}
+										<span
+											class="text-[10px] text-slate-500"
+											title="השיטה נוספה מאוחר יותר — הסה״כ וההפרש מולך מחושבים רק על המחזורים שיש לה נתונים"
+											>מ־מחזור {s.fromGw}</span
+										>
+									{/if}
 								</span>
 							</td>
 							<td class="px-2 py-1.5 text-center">
@@ -465,10 +494,14 @@
 									<span class="text-[11px] text-slate-500">—</span>
 								{/if}
 							</td>
-							<td class="px-2 py-1.5 text-center font-semibold text-white">{boardPts(s)}</td>
+							<td class="px-2 py-1.5 text-center font-semibold {pts == null ? 'text-slate-500' : 'text-white'}"
+								>{pts ?? '—'}</td
+							>
 							<td class="px-2 py-1.5 text-center">
 								{#if s.key === 'actual'}
 									<span class="text-[11px] text-slate-500">הבחירה שלך</span>
+								{:else if d == null}
+									<span class="text-[11px] text-slate-500">—</span>
 								{:else}
 									<span class="font-medium {d > 0 ? 'text-emerald-300' : d < 0 ? 'text-red-300' : 'text-slate-400'}"
 										>{fmtDelta(d)}</span
@@ -479,6 +512,12 @@
 					{/each}
 				</tbody>
 			</table>
+			{#if boardView === 'total' && st.series.some((s) => s.partial)}
+				<p class="mt-2 text-[11px] text-slate-500">
+					«מ־מחזור N» — שיטה שנוספה מאוחר יותר: הסה״כ שלה כולל רק את המחזורים שיש לה נתונים, וההפרש מולך
+					מחושב רק על אותם מחזורים.
+				</p>
+			{/if}
 		</div>
 
 		<!-- Cumulative chart, one mode at a time -->
@@ -518,6 +557,7 @@
 				{/each}
 				{#each chartSeries as s (s.key)}
 					{#each s.perGw as p, i}
+						{#if p.cumulative != null}
 						{@const v = Math.round(p.cumulative)}
 						{@const y = labelY.get(s.key)?.[i] ?? yFor(p.cumulative)}
 						{@const w = labelW(s.label, v)}
@@ -537,6 +577,7 @@
 								>{s.label} · <tspan font-weight="700">{v}</tspan></text
 							>
 						</g>
+						{/if}
 					{/each}
 				{/each}
 			</svg>

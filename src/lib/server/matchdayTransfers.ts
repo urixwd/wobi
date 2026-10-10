@@ -1,3 +1,4 @@
+
 /**
  * Matchday transfer suggestions.
  *
@@ -12,6 +13,7 @@
  */
 import { BUDGET_TOTAL, MAX_PER_CLUB, XI_POS_MAX } from '$lib/squadRules';
 import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
+import { formationLabel } from '$lib/positions';
 
 export type TPlayer = {
 	id: number;
@@ -24,12 +26,14 @@ export type TPlayer = {
 	points: number; // season points
 	form: number; // last-round points
 	vlfm: number; // points per million
+	/** Ease scores use EASE_SCORE, rated for the player's position (see $lib/difficulty). */
 	matchdayEase: number; // this matchday fixture: green +3, yellow +1, red -2
+	fixtureEase3: number; // average ease over the next up-to-3 fixtures
 	fixtureEase5: number; // average ease over the next up-to-5 fixtures
 	upcomingFixtures: UpcomingFixture[];
 };
 
-export type ObjectiveKey = 'points' | 'vlfm' | 'fixtures' | 'fixtures5' | 'form';
+export type ObjectiveKey = 'points' | 'vlfm' | 'fixtures' | 'fixtures3' | 'fixtures5' | 'form';
 
 export type TransferCombo = {
 	id: string; // sorted squad ids
@@ -45,6 +49,7 @@ export type TransferCombo = {
 	form: number; // XI sum
 	vlfm: number; // XI average
 	matchdayEase: number; // XI average
+	fixtureEase3: number; // XI average
 	fixtureEase5: number; // XI average
 };
 
@@ -68,6 +73,7 @@ export const OBJECTIVES: { key: ObjectiveKey; title: string }[] = [
 	{ key: 'points', title: 'מקסימום נקודות' },
 	{ key: 'vlfm', title: 'תמורה למחיר' },
 	{ key: 'fixtures', title: 'לוח קל למחזור' },
+	{ key: 'fixtures3', title: 'לוח קל ל־3 המחזורים הקרובים' },
 	{ key: 'fixtures5', title: 'לוח קל לחמשת המחזורים הקרובים' },
 	{ key: 'form', title: 'כושר (מחזור אחרון)' }
 ];
@@ -87,6 +93,7 @@ const SCORE: Record<ObjectiveKey, ScoreFn> = {
 	points: (p) => p.points,
 	vlfm: (p) => p.vlfm,
 	fixtures: (p) => p.matchdayEase,
+	fixtures3: (p) => p.fixtureEase3,
 	fixtures5: (p) => p.fixtureEase5,
 	form: (p) => p.form
 };
@@ -96,6 +103,7 @@ const COMBO_METRIC: Record<ObjectiveKey, (c: TransferCombo) => number> = {
 	points: (c) => c.points,
 	vlfm: (c) => c.vlfm,
 	fixtures: (c) => c.matchdayEase,
+	fixtures3: (c) => c.fixtureEase3,
 	fixtures5: (c) => c.fixtureEase5,
 	form: (c) => c.form
 };
@@ -172,12 +180,6 @@ function arrange(sq15: TPlayer[], score: ScoreFn): { xi: TPlayer[]; bench: TPlay
 	return best ? { xi: best.xi, bench: best.bench } : null;
 }
 
-function formationLabel(xi: TPlayer[]): string {
-	const c = { 2: 0, 3: 0, 4: 0 } as Record<number, number>;
-	for (const p of xi) if (p.position >= 2 && p.position <= 4) c[p.position]++;
-	return `${c[2]}-${c[3]}-${c[4]}`;
-}
-
 function makeCombo(newSquad: TPlayer[], squadIds: Set<number>, xi: TPlayer[], bench: TPlayer[]): TransferCombo {
 	const newIds = new Set(newSquad.map((p) => p.id));
 	const orderedXi = [...xi].sort((a, b) => a.position - b.position || b.points - a.points);
@@ -199,6 +201,7 @@ function makeCombo(newSquad: TPlayer[], squadIds: Set<number>, xi: TPlayer[], be
 		form: xi.reduce((s, p) => s + p.form, 0),
 		vlfm: xi.reduce((s, p) => s + p.vlfm, 0) / xi.length,
 		matchdayEase: xi.reduce((s, p) => s + p.matchdayEase, 0) / xi.length,
+		fixtureEase3: xi.reduce((s, p) => s + p.fixtureEase3, 0) / xi.length,
 		fixtureEase5: xi.reduce((s, p) => s + p.fixtureEase5, 0) / xi.length
 	};
 }

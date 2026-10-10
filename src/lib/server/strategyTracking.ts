@@ -1,7 +1,7 @@
 /**
  * "What-if" strategy tracking (from GW5 on).
  *
- * Each matchday we record the #1 team each of the 4 strategies would field, plus
+ * Each matchday we record the #1 team each strategy would field, plus
  * the user's actual team, into `strategy_picks`. The base for the what-if is the
  * PREVIOUS matchday's team; each strategy fills exactly the slots the user freed
  * (the players released vs. that previous team), taking incomers only from the
@@ -28,7 +28,9 @@ import {
 	getUpcomingFixturesByTeamIds,
 	type UpcomingFixture
 } from '$lib/server/upcomingFixtures';
-import type { FixtureDifficulty } from '$lib/server/db/schema';
+import { fixtureEase, matchdayEase } from '$lib/difficulty';
+import { formationLabel } from '$lib/positions';
+import { transferDiff } from '$lib/transfers';
 
 /** What-if tracking begins here; snapshots before this are ignored as "previous". */
 export const TRACKING_START_GW = 5;
@@ -37,6 +39,7 @@ export const STRATEGY_LABELS: Record<string, string> = {
 	points: 'מקסימום נקודות',
 	vlfm: 'תמורה למחיר',
 	fixtures: 'לוח קל למחזור',
+	fixtures3: 'לוח קל (3 מחזורים)',
 	fixtures5: 'לוח קל (5 מחזורים)',
 	form: 'כושר',
 	actual: 'הבחירה שלי'
@@ -62,20 +65,6 @@ export function parseStrategyKey(s: string): { objective: string; mode: string |
 	return i < 0 ? { objective: s, mode: null } : { objective: s.slice(0, i), mode: s.slice(i + 1) };
 }
 
-const EASE: Record<FixtureDifficulty, number> = { green: 3, yellow: 1, red: -2 };
-
-function matchdayEaseOf(upcoming: UpcomingFixture[], currentGw: number): number {
-	const f = upcoming.find((u) => u.gameweekNumber === currentGw) ?? upcoming[0];
-	return f ? EASE[f.difficulty] ?? 0 : 0;
-}
-
-/** Average ease over the next up-to-5 fixtures (matches /squad's "לוח (5)"). */
-function fixtureEase5Of(upcoming: UpcomingFixture[]): number {
-	const slice = upcoming.slice(0, 5);
-	if (!slice.length) return 0;
-	return slice.reduce((s, f) => s + (EASE[f.difficulty] ?? 0), 0) / slice.length;
-}
-
 type Row = { player: typeof players.$inferSelect; teamName: string | null; teamLogo: string | null };
 function toTPlayer(r: Row, upcoming: UpcomingFixture[], currentGw: number): TPlayer {
 	return {
@@ -89,8 +78,10 @@ function toTPlayer(r: Row, upcoming: UpcomingFixture[], currentGw: number): TPla
 		points: seasonPoints(r.player) ?? 0,
 		form: lastRoundPoints(r.player) ?? 0,
 		vlfm: vlfm(r.player) ?? 0,
-		matchdayEase: matchdayEaseOf(upcoming, currentGw),
-		fixtureEase5: fixtureEase5Of(upcoming),
+		// Ease on the shared scale, rated for THIS player's position.
+		matchdayEase: matchdayEase(upcoming, r.player.position, currentGw),
+		fixtureEase3: fixtureEase(upcoming, r.player.position, 3),
+		fixtureEase5: fixtureEase(upcoming, r.player.position, 5),
 		upcomingFixtures: upcoming
 	};
 }
@@ -207,12 +198,6 @@ export async function buildTransferInputs(currentGw: number, baseIds: number[]) 
 function spendOf(ps: TPlayer[]): number {
 	return Math.round(ps.reduce((s, p) => s + p.price, 0) * 10) / 10;
 }
-function formationOf(xi: TPlayer[]): string {
-	const c = { 2: 0, 3: 0, 4: 0 } as Record<number, number>;
-	for (const p of xi) if (p.position >= 2 && p.position <= 4) c[p.position]++;
-	return `${c[2]}-${c[3]}-${c[4]}`;
-}
-
 async function upsertPick(row: {
 	gameweekNumber: number;
 	strategy: string;
@@ -274,7 +259,7 @@ async function computeWhatIf(
 			strategy: 'actual',
 			xiPlayerIds: xiIds,
 			benchPlayerIds: benchIds,
-			formation: formationOf(actualXi),
+			formation: formationLabel(actualXi),
 			spend: spendOf(actualPlayers),
 			releasedPlayerIds: released
 		}
@@ -305,7 +290,7 @@ async function computeWhatIf(
 }
 
 /**
- * Record the actual team + the 4 strategies' what-if for `currentGw`.
+ * Record the actual team + each strategy's what-if for `currentGw`.
  * Call right after the user's final team is saved into `final_squads[currentGw]`.
  */
 export async function recordWhatIf(currentGw: number): Promise<{ recorded: string[] }> {
@@ -366,8 +351,18 @@ export type StandingSeries = {
 	mode: string | null; // null for 'actual'
 	label: string; // objective label
 	modeLabel: string | null;
+	/** Sum over the matchdays this series has data for (see `fromGw`). */
 	total: number;
-	perGw: { gw: number; points: number; cumulative: number }[];
+	/**
+	 * One entry per scored gameweek. `points`/`cumulative` are null where the
+	 * series has no pick (e.g. a strategy added later — fixtures3 has no GW5):
+	 * that's "no data", never 0 points.
+	 */
+	perGw: { gw: number; points: number | null; cumulative: number | null }[];
+	/** First scored gameweek this series has data for. */
+	fromGw: number | null;
+	/** True when the series is missing some scored gameweek (started later). */
+	partial: boolean;
 };
 export type Standings = {
 	gameweeks: number[]; // scored gameweeks, ascending
@@ -387,12 +382,13 @@ export async function getStandings(): Promise<Standings> {
 	const series: StandingSeries[] = keys.map((key) => {
 		const { objective, mode } = parseStrategyKey(key);
 		let cumulative = 0;
-		const perGw = gameweeks.map((gw) => {
+		const perGw: StandingSeries['perGw'] = gameweeks.map((gw) => {
 			const row = scored.find((r) => r.gameweekNumber === gw && r.strategy === key);
-			const points = row?.points ?? 0;
-			cumulative += points;
-			return { gw, points, cumulative };
+			if (row?.points == null) return { gw, points: null, cumulative: null };
+			cumulative += row.points;
+			return { gw, points: row.points, cumulative };
 		});
+		const covered = perGw.filter((p) => p.points != null);
 		return {
 			key,
 			objective,
@@ -400,7 +396,9 @@ export async function getStandings(): Promise<Standings> {
 			label: STRATEGY_LABELS[objective] ?? objective,
 			modeLabel: mode ? MODE_LABELS[mode] ?? mode : null,
 			total: cumulative,
-			perGw
+			perGw,
+			fromGw: covered[0]?.gw ?? null,
+			partial: covered.length < gameweeks.length
 		};
 	});
 
@@ -444,6 +442,7 @@ export type PickMetrics = {
 	points: number;
 	vlfm: number;
 	matchdayEase: number;
+	fixtureEase3: number;
 	fixtureEase5: number;
 	form: number;
 };
@@ -465,7 +464,7 @@ export type MatchdayDetail = {
 	constraints: PendingConstraints;
 } | null;
 
-const OBJ_ORDER = ['points', 'vlfm', 'fixtures', 'fixtures5', 'form'];
+const OBJ_ORDER = ['points', 'vlfm', 'fixtures', 'fixtures3', 'fixtures5', 'form'];
 const MODE_ORDER = ['constrained', 'out', 'free'];
 
 /** Gameweeks that have any recorded strategy picks, ascending. */
@@ -554,15 +553,14 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 	const { base, wishlist } = await buildTransferInputs(gw, baseIds);
 	const baseIdSet = new Set(baseIds);
 
-	// Each pick's transfers vs. the base team (out in base order, in by position).
+	// Each pick's transfers vs. the base team.
+	const metaById = new Map<number, { name: string; position: number }>(
+		[...base, ...list.flatMap((pk) => [...pk.xi, ...pk.bench])].map((p) => [p.id, p])
+	);
 	for (const pk of list) {
-		const ids = new Set([...pk.xi, ...pk.bench].map((p) => p.id));
-		pk.out = base.filter((p) => !ids.has(p.id)).map((p) => ({ id: p.id, name: p.name, position: p.position }));
-		pk.in = [...pk.xi, ...pk.bench]
-			.filter((p) => !baseIdSet.has(p.id))
-			.map((p) => ({ id: p.id, name: p.name, position: p.position }));
-		pk.out.sort((a, b) => a.position - b.position);
-		pk.in.sort((a, b) => a.position - b.position);
+		const diff = transferDiff(baseIds, [...pk.xi, ...pk.bench].map((p) => p.id), metaById);
+		pk.out = diff.out;
+		pk.in = diff.in;
 	}
 
 	// Same XI metrics the transfer engine optimises (see makeCombo), for the open matchday.
@@ -579,6 +577,7 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 				points: xi.reduce((s, p) => s + p.points, 0),
 				vlfm: avg((p) => p.vlfm),
 				matchdayEase: avg((p) => p.matchdayEase),
+				fixtureEase3: avg((p) => p.fixtureEase3),
 				fixtureEase5: avg((p) => p.fixtureEase5),
 				form: xi.reduce((s, p) => s + p.form, 0)
 			};

@@ -6,8 +6,9 @@
 import { BUDGET_TOTAL, XI_POS_MAX, XI_TOTAL_MAX } from '$lib/squadRules';
 import { seasonPoints } from '$lib/stats';
 import { vlfm } from '$lib/playerMetrics';
-import type { FixtureDifficulty } from '$lib/server/db/schema';
+import { fixtureEase } from '$lib/difficulty';
 import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
+import { formationLabel } from '$lib/positions';
 
 export const MAX_TRANSFERS = 3;
 
@@ -58,13 +59,6 @@ export type SquadOption = {
 	transfersUsed: number;
 };
 
-function fixtureEase(fixtures: UpcomingFixture[]): number {
-	if (!fixtures?.length) return 0;
-	const rank: Record<FixtureDifficulty, number> = { green: 3, yellow: 1, red: -2 };
-	const slice = fixtures.slice(0, 3);
-	return slice.reduce((s, f) => s + (rank[f.difficulty] ?? 0), 0) / slice.length;
-}
-
 export function toOptionPlayer(raw: {
 	id: number;
 	name: string;
@@ -88,7 +82,8 @@ export function toOptionPlayer(raw: {
 		price: raw.price,
 		points: pts,
 		vlfm: v,
-		fixtureEase: fixtureEase(raw.upcomingFixtures ?? []),
+		// Next-3 ease, rated for this player's position (shared scale).
+		fixtureEase: fixtureEase(raw.upcomingFixtures, raw.position, 3),
 		logo: raw.logo,
 		upcomingFixtures: raw.upcomingFixtures ?? []
 	};
@@ -98,14 +93,6 @@ type ScoreFn = (p: OptionPlayer) => number;
 
 function spendOf(players: OptionPlayer[]) {
 	return players.reduce((s, p) => s + p.price, 0);
-}
-
-function formationLabel(xi: OptionPlayer[]): string {
-	const c = { 2: 0, 3: 0, 4: 0 };
-	for (const p of xi) {
-		if (p.position === 2 || p.position === 3 || p.position === 4) c[p.position as 2 | 3 | 4]++;
-	}
-	return `${c[2]}-${c[3]}-${c[4]}`;
 }
 
 function countsByPos(squad: OptionPlayer[]) {
