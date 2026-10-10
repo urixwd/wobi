@@ -1,5 +1,5 @@
 -- WOBI Postgres dump
--- generated: 2026-10-08T20:17:51.213Z
+-- generated: 2026-10-10T08:50:43.081Z
 -- source: DATABASE_URL (credentials redacted)
 -- restore: psql "$DATABASE_URL" -f db/dumps/latest.sql
 
@@ -7,7 +7,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict e4miEDCXJI1Syss2gVCwcXXZyGMxRIhkdfLdmBJpIfaGvVSCPeCZmGBO0eq00CK
+\restrict Hm8SKODZejjCeVKGXwbNlBauAR9udg26NsDg8yBbCsIUTqaX6rUNJZqwdgwkey0
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -35,6 +35,7 @@ ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_ga
 ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_away_team_id_teams_id_fk;
 DROP INDEX IF EXISTS public.watchlist_round_player_uidx;
 DROP INDEX IF EXISTS public.watchlist_permanent_player_uidx;
+DROP INDEX IF EXISTS public.team_difficulty_gw_team_uidx;
 DROP INDEX IF EXISTS public.strategy_picks_gw_strategy_uidx;
 DROP INDEX IF EXISTS public.player_snapshots_gw_player_uidx;
 DROP INDEX IF EXISTS public.player_round_stats_player_s5_uidx;
@@ -43,6 +44,7 @@ DROP INDEX IF EXISTS public.final_squads_gw_uidx;
 ALTER TABLE IF EXISTS ONLY public.watchlist_round DROP CONSTRAINT IF EXISTS watchlist_round_pkey;
 ALTER TABLE IF EXISTS ONLY public.watchlist_permanent DROP CONSTRAINT IF EXISTS watchlist_permanent_pkey;
 ALTER TABLE IF EXISTS ONLY public.teams DROP CONSTRAINT IF EXISTS teams_pkey;
+ALTER TABLE IF EXISTS ONLY public.team_difficulty DROP CONSTRAINT IF EXISTS team_difficulty_pkey;
 ALTER TABLE IF EXISTS ONLY public.strategy_picks DROP CONSTRAINT IF EXISTS strategy_picks_pkey;
 ALTER TABLE IF EXISTS ONLY public.sketches DROP CONSTRAINT IF EXISTS sketches_pkey;
 ALTER TABLE IF EXISTS ONLY public.players DROP CONSTRAINT IF EXISTS players_pkey;
@@ -56,6 +58,7 @@ ALTER TABLE IF EXISTS ONLY public.fixtures DROP CONSTRAINT IF EXISTS fixtures_pk
 ALTER TABLE IF EXISTS ONLY public.final_squads DROP CONSTRAINT IF EXISTS final_squads_pkey;
 ALTER TABLE IF EXISTS public.watchlist_round ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.watchlist_permanent ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.team_difficulty ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.strategy_picks ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.sketches ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE IF EXISTS public.player_snapshots ALTER COLUMN id DROP DEFAULT;
@@ -70,6 +73,8 @@ DROP TABLE IF EXISTS public.watchlist_round;
 DROP SEQUENCE IF EXISTS public.watchlist_permanent_id_seq;
 DROP TABLE IF EXISTS public.watchlist_permanent;
 DROP TABLE IF EXISTS public.teams;
+DROP SEQUENCE IF EXISTS public.team_difficulty_id_seq;
+DROP TABLE IF EXISTS public.team_difficulty;
 DROP SEQUENCE IF EXISTS public.strategy_picks_id_seq;
 DROP TABLE IF EXISTS public.strategy_picks;
 DROP SEQUENCE IF EXISTS public.sketches_id_seq;
@@ -454,6 +459,41 @@ ALTER SEQUENCE public.strategy_picks_id_seq OWNED BY public.strategy_picks.id;
 
 
 --
+-- Name: team_difficulty; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.team_difficulty (
+    id integer NOT NULL,
+    gameweek_number integer NOT NULL,
+    team_id integer NOT NULL,
+    overall text NOT NULL,
+    vs_def text NOT NULL,
+    vs_att text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: team_difficulty_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.team_difficulty_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: team_difficulty_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.team_difficulty_id_seq OWNED BY public.team_difficulty.id;
+
+
+--
 -- Name: teams; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -593,6 +633,13 @@ ALTER TABLE ONLY public.sketches ALTER COLUMN id SET DEFAULT nextval('public.ske
 --
 
 ALTER TABLE ONLY public.strategy_picks ALTER COLUMN id SET DEFAULT nextval('public.strategy_picks_id_seq'::regclass);
+
+
+--
+-- Name: team_difficulty id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_difficulty ALTER COLUMN id SET DEFAULT nextval('public.team_difficulty_id_seq'::regclass);
 
 
 --
@@ -848,8 +895,8 @@ COPY public.gameweeks (id, number, label, is_current, starts_at, ends_at) FROM s
 --
 
 COPY public.matchday_plan (id, gameweek_number, must_in_ids, updated_at, must_out_ids) FROM stdin;
-14	6	[]	2026-10-08 22:17:44.489+02	[]
 7	5	[3474]	2026-09-18 14:08:39.829+02	[3699, 2732]
+14	6	[7257]	2026-10-08 22:26:15.227+02	[]
 \.
 
 
@@ -3479,6 +3526,28 @@ COPY public.strategy_picks (id, gameweek_number, strategy, xi_player_ids, bench_
 
 
 --
+-- Data for Name: team_difficulty; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.team_difficulty (id, gameweek_number, team_id, overall, vs_def, vs_att, updated_at) FROM stdin;
+1	6	133	red	red	red	2026-10-10 10:34:29.27657+02
+2	6	134	green	green	green	2026-10-10 10:34:29.27657+02
+4	6	138	red	red	red	2026-10-10 10:34:29.27657+02
+5	6	140	red	red	red	2026-10-10 10:34:29.27657+02
+6	6	197	green	green	green	2026-10-10 10:34:29.27657+02
+7	6	198	green	green	green	2026-10-10 10:34:29.27657+02
+8	6	285	green	green	green	2026-10-10 10:34:29.27657+02
+10	6	128	red	red	red	2026-10-10 10:34:29.27657+02
+11	6	129	green	green	green	2026-10-10 10:34:29.27657+02
+12	6	130	red	red	red	2026-10-10 10:34:29.27657+02
+14	6	132	yellow	yellow	yellow	2026-10-10 10:34:29.27657+02
+13	6	131	yellow	yellow	yellow	2026-10-10 10:34:29.27657+02
+3	6	136	green	yellow	green	2026-10-10 10:45:33.381+02
+9	6	127	green	green	green	2026-10-10 10:49:24.394+02
+\.
+
+
+--
 -- Data for Name: teams; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -3523,6 +3592,7 @@ COPY public.watchlist_permanent (id, player_id, notes, created_at) FROM stdin;
 27	464	\N	2026-09-18 12:36:55.221095+02
 28	7292	\N	2026-10-08 21:42:35.208368+02
 29	7274	\N	2026-10-08 22:10:40.129287+02
+30	688	\N	2026-10-10 10:06:12.026613+02
 \.
 
 
@@ -3550,6 +3620,7 @@ COPY public.watchlist_round (id, player_id, gameweek_number, notes, created_at) 
 65	3743	6	\N	2026-10-08 22:03:16.334708+02
 38	522	6	\N	2026-09-18 11:46:55.153881+02
 67	6587	6	\N	2026-10-08 22:03:19.02568+02
+68	688	6	\N	2026-10-10 10:06:07.773262+02
 \.
 
 
@@ -3578,7 +3649,7 @@ SELECT pg_catalog.setval('public.gameweeks_id_seq', 80, true);
 -- Name: matchday_plan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.matchday_plan_id_seq', 59, true);
+SELECT pg_catalog.setval('public.matchday_plan_id_seq', 66, true);
 
 
 --
@@ -3606,7 +3677,7 @@ SELECT pg_catalog.setval('public.player_snapshots_id_seq', 1248, true);
 -- Name: sketches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.sketches_id_seq', 13, true);
+SELECT pg_catalog.setval('public.sketches_id_seq', 14, true);
 
 
 --
@@ -3617,17 +3688,24 @@ SELECT pg_catalog.setval('public.strategy_picks_id_seq', 57, true);
 
 
 --
+-- Name: team_difficulty_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.team_difficulty_id_seq', 14, true);
+
+
+--
 -- Name: watchlist_permanent_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.watchlist_permanent_id_seq', 29, true);
+SELECT pg_catalog.setval('public.watchlist_permanent_id_seq', 33, true);
 
 
 --
 -- Name: watchlist_round_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.watchlist_round_id_seq', 67, true);
+SELECT pg_catalog.setval('public.watchlist_round_id_seq', 71, true);
 
 
 --
@@ -3719,6 +3797,14 @@ ALTER TABLE ONLY public.strategy_picks
 
 
 --
+-- Name: team_difficulty team_difficulty_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.team_difficulty
+    ADD CONSTRAINT team_difficulty_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3775,6 +3861,13 @@ CREATE UNIQUE INDEX player_snapshots_gw_player_uidx ON public.player_snapshots U
 --
 
 CREATE UNIQUE INDEX strategy_picks_gw_strategy_uidx ON public.strategy_picks USING btree (gameweek_number, strategy);
+
+
+--
+-- Name: team_difficulty_gw_team_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX team_difficulty_gw_team_uidx ON public.team_difficulty USING btree (gameweek_number, team_id);
 
 
 --
@@ -3867,5 +3960,5 @@ ALTER TABLE ONLY public.watchlist_round
 -- PostgreSQL database dump complete
 --
 
-\unrestrict e4miEDCXJI1Syss2gVCwcXXZyGMxRIhkdfLdmBJpIfaGvVSCPeCZmGBO0eq00CK
+\unrestrict Hm8SKODZejjCeVKGXwbNlBauAR9udg26NsDg8yBbCsIUTqaX6rUNJZqwdgwkey0
 
