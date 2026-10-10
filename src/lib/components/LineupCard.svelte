@@ -76,7 +76,7 @@
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
 </script>
 
-<article class="flex flex-col gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-lg">
+<article class="flex flex-col gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-3 shadow-lg">
 	<div class="flex flex-wrap items-start justify-between gap-2">
 		<div>
 			{#if heading}{@render heading()}{:else}<h3 class="text-base font-semibold text-emerald-300">{title}</h3>{/if}
@@ -113,11 +113,12 @@
 
 	{@render insights?.()}
 
-	<div class="space-y-2 rounded-xl bg-gradient-to-b from-emerald-950/40 to-slate-950/60 p-3">
+	<!-- Tight spacing: 5 players (4.5rem each) fit a row even with 3 cards side by side on a laptop -->
+	<div class="space-y-2 rounded-xl bg-gradient-to-b from-emerald-950/40 to-slate-950/60 px-1.5 py-2">
 		{#if !xi.length}<p class="text-center text-xs text-slate-500">הרכב ריק</p>{/if}
 		{#each [1, 2, 3, 4] as pos}
 			{#if byPos(pos).length}
-				<div class="flex flex-wrap justify-center gap-2">
+				<div class="flex flex-wrap justify-center gap-1">
 					{#each byPos(pos) as p (p.id)}
 						<CompactPlayerCard
 							name={p.name}

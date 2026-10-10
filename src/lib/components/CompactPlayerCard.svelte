@@ -31,7 +31,7 @@
 </script>
 
 {#if variant === 'bench'}
-	<div class="min-w-[6rem] flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-2 py-1 text-center">
+	<div class="min-w-[4.5rem] flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-2 py-1 text-center">
 		{#if positionLabel}
 			<div class="text-[10px] text-slate-500">{positionLabel}</div>
 		{/if}
@@ -47,7 +47,7 @@
 	</div>
 {:else}
 	<div
-		class="w-[5rem] rounded-lg border border-slate-600/60 bg-slate-900/90 px-1 py-1 text-center"
+		class="w-[4.5rem] rounded-lg border border-slate-600/60 bg-slate-900/90 px-0.5 py-1 text-center"
 	>
 		<div class="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white">
 			{#if logo}
