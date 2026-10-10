@@ -223,6 +223,7 @@ export const finalSquads = pgTable(
 		/** Constraints in effect when this matchday was recorded (frozen log). */
 		mustInIds: jsonb('must_in_ids').$type<number[]>().notNull().default([]),
 		mustOutIds: jsonb('must_out_ids').$type<number[]>().notNull().default([]),
+		preferKeepIds: jsonb('prefer_keep_ids').$type<number[]>().notNull().default([]),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('final_squads_gw_uidx').on(t.gameweekNumber)]
@@ -267,6 +268,8 @@ export const matchdayPlan = pgTable(
 		gameweekNumber: integer('gameweek_number').notNull(),
 		mustInIds: jsonb('must_in_ids').$type<number[]>().notNull().default([]),
 		mustOutIds: jsonb('must_out_ids').$type<number[]>().notNull().default([]),
+		/** Squad players to keep if any legal plan allows it (soft; strategies avoid releasing them). */
+		preferKeepIds: jsonb('prefer_keep_ids').$type<number[]>().notNull().default([]),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('matchday_plan_gw_uidx').on(t.gameweekNumber)]

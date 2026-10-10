@@ -166,19 +166,54 @@ export async function setMustOut(gameweekNumber: number, ids: number[]): Promise
 		});
 }
 
-/** Toggle a player in a matchday planner (max 3). Returns an error message when full. */
+/** Squad players to keep if the constraints allow it (persisted per matchday). */
+export async function getPreferKeep(gameweekNumber: number): Promise<number[]> {
+	const row = (
+		await db.select().from(matchdayPlan).where(eq(matchdayPlan.gameweekNumber, gameweekNumber)).limit(1)
+	)[0];
+	return row?.preferKeepIds ?? [];
+}
+
+export async function setPreferKeep(gameweekNumber: number, ids: number[]): Promise<void> {
+	await db
+		.insert(matchdayPlan)
+		.values({ gameweekNumber, preferKeepIds: ids })
+		.onConflictDoUpdate({
+			target: matchdayPlan.gameweekNumber,
+			set: { preferKeepIds: ids, updatedAt: new Date() }
+		});
+}
+
+export type PlanKind = 'in' | 'out' | 'keep';
+
+/**
+ * Toggle a player in a matchday planner. «in» / «out» allow up to 3. «out» and
+ * «keep» are exclusive: marking one removes the player from the other.
+ * Returns an error message when a list is full.
+ */
 export async function toggleMustPick(
-	kind: 'in' | 'out',
+	kind: PlanKind,
 	gameweekNumber: number,
 	playerId: number
 ): Promise<string | null> {
-	const cur = new Set(kind === 'in' ? await getMustIn(gameweekNumber) : await getMustOut(gameweekNumber));
+	const get = { in: getMustIn, out: getMustOut, keep: getPreferKeep }[kind];
+	const set = { in: setMustIn, out: setMustOut, keep: setPreferKeep }[kind];
+	const cur = new Set(await get(gameweekNumber));
 	if (cur.has(playerId)) cur.delete(playerId);
 	else {
-		if (cur.size >= 3) return kind === 'in' ? 'עד 3 שחייבים להיכנס' : 'עד 3 לשחרר';
+		if (kind !== 'keep' && cur.size >= 3) return kind === 'in' ? 'עד 3 שחייבים להיכנס' : 'עד 3 לשחרר';
 		cur.add(playerId);
+		const other = kind === 'out' ? 'keep' : kind === 'keep' ? 'out' : null;
+		if (other) {
+			const o = await { out: getMustOut, keep: getPreferKeep }[other](gameweekNumber);
+			if (o.includes(playerId))
+				await { out: setMustOut, keep: setPreferKeep }[other](
+					gameweekNumber,
+					o.filter((id) => id !== playerId)
+				);
+		}
 	}
-	await (kind === 'in' ? setMustIn : setMustOut)(gameweekNumber, [...cur]);
+	await set(gameweekNumber, [...cur]);
 	return null;
 }
 
@@ -241,7 +276,7 @@ async function computeWhatIf(
 	currentGw: number,
 	xiIds: number[],
 	benchIds: number[]
-): Promise<{ rows: WhatIfRow[]; mustIn: number[]; mustOut: number[] }> {
+): Promise<{ rows: WhatIfRow[]; mustIn: number[]; mustOut: number[]; preferKeep: number[] }> {
 	const currentIds = [...xiIds, ...benchIds];
 	const { ids: baseIds, fromGw } = await getBaseSquad(currentGw);
 	const released = fromGw != null ? detectReleased(baseIds, currentIds) : [];
@@ -250,6 +285,9 @@ async function computeWhatIf(
 	const inboundIds = new Set(wishlist.map((p) => p.id).filter((id) => !baseIds.includes(id)));
 	// Mandatory picks come from the persisted planners (must_out ⊆ base, must_in ⊆ inbound).
 	const mustOut = (await getMustOut(currentGw)).filter((id) => baseIds.includes(id));
+	const preferKeep = (await getPreferKeep(currentGw)).filter(
+		(id) => baseIds.includes(id) && !mustOut.includes(id)
+	);
 	const mustIn = (await getMustIn(currentGw)).filter((id) => inboundIds.has(id));
 
 	const actualPlayers = (await buildTransferInputs(currentGw, currentIds)).base;
@@ -268,12 +306,13 @@ async function computeWhatIf(
 	// Each strategy under three constraint modes. (At the first tracked
 	// matchday there's no previous team, so the base is the current squad.)
 	const modeDefs = [
-		{ mode: 'constrained', out: new Set(mustOut), in: new Set(mustIn), rel: mustOut },
-		{ mode: 'out', out: new Set(mustOut), in: new Set<number>(), rel: mustOut },
-		{ mode: 'free', out: new Set<number>(), in: new Set<number>(), rel: [] as number[] }
+		// «Prefer to keep» is an outgoing-side rule, so it applies wherever «must go out» does.
+		{ mode: 'constrained', out: new Set(mustOut), in: new Set(mustIn), keep: new Set(preferKeep), rel: mustOut },
+		{ mode: 'out', out: new Set(mustOut), in: new Set<number>(), keep: new Set(preferKeep), rel: mustOut },
+		{ mode: 'free', out: new Set<number>(), in: new Set<number>(), keep: new Set<number>(), rel: [] as number[] }
 	];
 	for (const md of modeDefs) {
-		const res = buildTransfers(base, wishlist, md.out, md.in, 3);
+		const res = buildTransfers(base, wishlist, md.out, md.in, 3, 5, md.keep);
 		for (const b of res.best) {
 			if (!b.combo) continue;
 			rows.push({
@@ -286,7 +325,7 @@ async function computeWhatIf(
 			});
 		}
 	}
-	return { rows, mustIn, mustOut };
+	return { rows, mustIn, mustOut, preferKeep };
 }
 
 /**
@@ -299,7 +338,7 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	)[0];
 	if (!current) return { recorded: [] };
 
-	const { rows, mustIn, mustOut } = await computeWhatIf(
+	const { rows, mustIn, mustOut, preferKeep } = await computeWhatIf(
 		currentGw,
 		current.xiPlayerIds,
 		current.benchPlayerIds
@@ -308,7 +347,7 @@ export async function recordWhatIf(currentGw: number): Promise<{ recorded: strin
 	// Freeze the constraints onto the official snapshot (a permanent per-matchday log).
 	await db
 		.update(finalSquads)
-		.set({ mustInIds: mustIn, mustOutIds: mustOut })
+		.set({ mustInIds: mustIn, mustOutIds: mustOut, preferKeepIds: preferKeep })
 		.where(eq(finalSquads.gameweekNumber, currentGw));
 
 	for (const r of rows) await upsertPick({ gameweekNumber: currentGw, ...r });
@@ -451,6 +490,7 @@ export type PendingConstraints = {
 	squad: ConstraintPlayer[]; // base squad (the release picker's list)
 	inbound: ConstraintPlayer[]; // wishlist candidates (the must-in picker's list)
 	forcedOut: number[];
+	preferKeep: number[];
 	forcedIn: number[];
 };
 export type MatchdayDetail = {
@@ -478,7 +518,7 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 	const recorded = await db.select().from(strategyPicks).where(eq(strategyPicks.gameweekNumber, gw));
 	const live = !recorded.length;
 	let picks: { strategy: string; xiPlayerIds: number[]; benchPlayerIds: number[]; formation: string | null; spend: number | null; points: number | null }[] = recorded;
-	let liveConstraints: { mustIn: number[]; mustOut: number[] } | null = null;
+	let liveConstraints: { mustIn: number[]; mustOut: number[]; preferKeep: number[] } | null = null;
 	if (live) {
 		// Only the open matchday gets a live preview; a past unrecorded one has nothing to show.
 		const cur = (await db.select().from(gameweeks).where(eq(gameweeks.isCurrent, true)).limit(1))[0];
@@ -486,7 +526,7 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 		if (cur?.number !== gw || !squad) return null;
 		const res = await computeWhatIf(gw, squad.xiPlayerIds, squad.benchPlayerIds);
 		picks = res.rows.map((r) => ({ ...r, points: null }));
-		liveConstraints = { mustIn: res.mustIn, mustOut: res.mustOut };
+		liveConstraints = { mustIn: res.mustIn, mustOut: res.mustOut, preferKeep: res.preferKeep };
 	}
 	if (!picks.length) return null;
 	const scored = picks.some((r) => r.points != null);
@@ -594,6 +634,7 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 		squad: base.map(asCP).sort((a, b) => a.position - b.position),
 		inbound: inbound.map(asCP).sort((a, b) => a.position - b.position),
 		forcedOut: (liveConstraints?.mustOut ?? finalRow?.mustOutIds ?? []).filter((id) => baseIdSet.has(id)),
+		preferKeep: (liveConstraints?.preferKeep ?? finalRow?.preferKeepIds ?? []).filter((id) => baseIdSet.has(id)),
 		forcedIn: (liveConstraints?.mustIn ?? finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id))
 	};
 

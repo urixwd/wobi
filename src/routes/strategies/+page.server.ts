@@ -6,7 +6,8 @@ import {
 	getStandings,
 	getMatchdayDetail,
 	getRecordedGameweeks,
-	toggleMustPick
+	toggleMustPick,
+	type PlanKind
 } from '$lib/server/strategyTracking';
 import { resolveCurrentGwNumber } from '$lib/server/upcomingFixtures';
 import type { Actions, PageServerLoad } from './$types';
@@ -31,7 +32,7 @@ export const load: PageServerLoad = async ({ url }) => {
 };
 
 /** Planner toggles, open matchday only (past matchdays are a frozen log). */
-async function toggle(kind: 'in' | 'out', request: Request) {
+async function toggle(kind: PlanKind, request: Request) {
 	const playerId = Number((await request.formData()).get('playerId'));
 	if (!playerId) return fail(400, { message: 'חסר שחקן' });
 	const err = await toggleMustPick(kind, await resolveCurrentGwNumber(4), playerId);
@@ -49,6 +50,7 @@ function parseIdList(raw: FormDataEntryValue | null): number[] {
 export const actions: Actions = {
 	toggleMustIn: ({ request }) => toggle('in', request),
 	toggleMustOut: ({ request }) => toggle('out', request),
+	togglePreferKeep: ({ request }) => toggle('keep', request),
 	/** Save a strategy's lineup as a sketch (same as /watchlist, /squad). */
 	saveSketch: async ({ request }) => {
 		const form = await request.formData();

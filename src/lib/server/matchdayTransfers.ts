@@ -218,7 +218,9 @@ export function buildTransfers(
 	forcedOutIds: Set<number>,
 	forcedInIds: Set<number> = new Set(),
 	maxTransfers = 3,
-	topN = 5
+	topN = 5,
+	/** Soft: plans that release fewer of these win before the objective is compared. */
+	preferKeepIds: Set<number> = new Set()
 ): TransferResult {
 	squadById = new Map(squad.map((p) => [p.id, p]));
 	const squadIds = new Set(squad.map((p) => p.id));
@@ -274,7 +276,7 @@ export function buildTransfers(
 	let plans = 0;
 	let capped = false;
 
-	const bestByObj = new Map<ObjectiveKey, { combo: TransferCombo; sc: number }>();
+	const bestByObj = new Map<ObjectiveKey, { combo: TransferCombo; sc: number; kept: number }>();
 	const pointsCombos = new Map<string, TransferCombo>();
 
 	outer: for (let k = kMin; k <= maxTransfers; k++) {
@@ -284,6 +286,8 @@ export function buildTransfers(
 		for (const eo of extraOuts) {
 			const outSet = [...forcedPlayers, ...eo];
 			const removeIds = new Set(outSet.map((p) => p.id));
+			// How many «prefer to keep» players this plan releases (lower is better).
+			const released = outSet.filter((p) => preferKeepIds.has(p.id)).length;
 			const kept = squad.filter((p) => !removeIds.has(p.id));
 			for (const inn of inSets) {
 				if (++plans > PLAN_CAP) {
@@ -310,8 +314,12 @@ export function buildTransfers(
 					const combo = makeCombo(newSquad, squadIds, arr.xi, arr.bench);
 					const sc = COMBO_METRIC[key](combo);
 					const cur = bestByObj.get(key);
-					if (!cur || sc > cur.sc + 1e-9 || (Math.abs(sc - cur.sc) <= 1e-9 && combo.points > cur.combo.points))
-						bestByObj.set(key, { combo, sc: Math.max(sc, cur?.sc ?? -Infinity) });
+					const better =
+						!cur ||
+						released < cur.kept ||
+						(released === cur.kept &&
+							(sc > cur.sc + 1e-9 || (Math.abs(sc - cur.sc) <= 1e-9 && combo.points > cur.combo.points)));
+					if (better) bestByObj.set(key, { combo, sc, kept: released });
 				}
 			}
 		}

@@ -72,9 +72,9 @@ psql "$DB" -c "SELECT number, is_current FROM gameweeks WHERE is_current;"      
 
 ## Constraints: F locked, P open
 
-The planners ("must go out" / "must come in") are per matchday. After moving to P, confirm both sides:
+The planners ("must go out" / "prefer to keep" / "must come in") are per matchday. After moving to P, confirm both sides:
 
-- **F is locked.** Its constraints were frozen into `final_squads[F]` (`must_in_ids` / `must_out_ids`) when Uri pressed «שמור קבוצה». `/strategies?gw=F` shows them read-only (no `toggleMust` forms in the HTML) with the planned counts, not (0).
+- **F is locked.** Its constraints were frozen into `final_squads[F]` (`must_in_ids` / `must_out_ids` / `prefer_keep_ids`) when Uri pressed «שמור קבוצה». `/strategies?gw=F` shows them read-only (no `toggleMust` forms in the HTML) with the planned counts, not (0).
 - **P is open.** `/strategies` defaults to P («מחזור פתוח — תצוגה חיה») with clickable chips (max 3 each); `/watchlist` has the same pickers. They save to `matchday_plan[P]`, which starts empty.
 
 ```bash

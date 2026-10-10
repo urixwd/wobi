@@ -46,7 +46,7 @@
 		form: 'סכום הנקודות ש־11 השחקנים צברו במחזור האחרון בלבד. נבחר ההרכב עם הסכום הגבוה ביותר; בשוויון — יותר נקודות עונה.'
 	};
 	const HOW_COMMON =
-		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה. בשיטות הלוח, קושי היריב תלוי בעמדת השחקן — שוער והגנה מול התקפת היריב, קישור והתקפה מול הגנת היריב — ונקבע לכל מחזור ב־/difficulty.';
+		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה. בשיטות הלוח, קושי היריב תלוי בעמדת השחקן — שוער והגנה מול התקפת היריב, קישור והתקפה מול הגנת היריב — ונקבע לכל מחזור ב־/difficulty. מצבים: «מוגבל» מכבד את «לשחרר», «עדיף לא להוציא» ו«חייבים להיכנס»; «יציאה בלבד» את «לשחרר» ו«עדיף לא להוציא»; «חופשי» אף אחד.';
 
 	const MODE_TABS = [
 		{ key: 'constrained', label: 'מוגבל' },
@@ -231,6 +231,7 @@
 		{@const c = detail.constraints}
 		{@const outIds = new Set(c.forcedOut)}
 		{@const inIds = new Set(c.forcedIn)}
+		{@const keepIds = new Set(c.preferKeep)}
 		<div class="space-y-3">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<div>
@@ -267,7 +268,7 @@
 			</div>
 
 			<!-- Constraint log (same lists as /watchlist); editable for the open matchday only -->
-			<div class="grid gap-3 md:grid-cols-2">
+			<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
 				<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
 					<h3 class="mb-2 text-sm font-semibold text-slate-300">
 						לשחרר מהקבוצה <span class="text-slate-500">({c.forcedOut.length})</span>
@@ -293,6 +294,42 @@
 							{:else}
 								<span class={cls}>
 									{on ? '✕ ' : ''}{p.name}
+									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+								</span>
+							{/if}
+						{/each}
+					</div>
+				</div>
+				<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
+					<h3 class="mb-1 text-sm font-semibold text-slate-300">
+						עדיף לא להוציא <span class="text-slate-500">({c.preferKeep.length})</span>
+					</h3>
+					<p class="mb-2 text-[11px] text-slate-500">
+						השיטות ישאירו אותם אם אפשר במסגרת האילוצים. יצאו רק אם אין דרך חוקית אחרת.
+					</p>
+					<div class="flex flex-wrap gap-1.5">
+						{#each c.squad as p (p.id)}
+							{@const on = keepIds.has(p.id)}
+							{@const cls = `rounded-lg border px-2 py-1 text-xs ${on
+								? 'border-sky-500/60 bg-sky-500/20 text-sky-200'
+								: outIds.has(p.id)
+									? 'border-slate-800 bg-slate-900/60 text-slate-600 line-through'
+									: 'border-slate-700 bg-slate-800/60 text-slate-400'}`}
+							{#if detail.live}
+								<form method="POST" action="?/togglePreferKeep" use:enhance>
+									<input type="hidden" name="playerId" value={p.id} />
+									<button
+										type="submit"
+										class="{cls} transition hover:border-slate-500"
+										title={outIds.has(p.id) ? 'מסומן לשחרור — לחיצה תעביר אותו לכאן' : undefined}
+									>
+										{on ? '🛡 ' : ''}{p.name}
+										<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+									</button>
+								</form>
+							{:else}
+								<span class={cls}>
+									{on ? '🛡 ' : ''}{p.name}
 									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 								</span>
 							{/if}
