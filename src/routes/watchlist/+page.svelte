@@ -1,10 +1,8 @@
 <script lang="ts">
 	import PlayerRow from '$lib/components/PlayerRow.svelte';
-	import LineupCard from '$lib/components/LineupCard.svelte';
 	import { enhance } from '$app/forms';
-	import type { TransferCombo } from '$lib/server/matchdayTransfers';
 
-	let { data, form } = $props();
+	let { data } = $props();
 	let q = $state('');
 	let list: 'permanent' | 'round' = $state('round');
 
@@ -16,107 +14,18 @@
 
 	const permIds = $derived(new Set(data.permanent.map((i) => i.player.id)));
 	const roundIds = $derived(new Set(data.round.map((i) => i.player.id)));
-
-	const transfers = $derived(data.transfers);
-	type Obj = (typeof transfers)['byObjective'][number];
-	type Variant = Obj['variants'][number];
-	const outSet = $derived(new Set(data.forcedOut));
-	const inSet = $derived(new Set(data.forcedIn));
-	const MAX_OUT = 3;
-	const MAX_IN = 3;
-	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
-
-	// Both pickers persist server-side per matchday (forms below).
-
-	// Mode filter (חופשי / יציאה בלבד / מוגבל), persisted locally.
-	const allModes = $derived(
-		transfers.byObjective[0]?.variants.map((v) => ({ key: v.mode, label: v.modeLabel })) ?? []
-	);
-	const MODES_KEY = 'wobi.watchlist.modes';
-	let selectedModes = $state<string[]>(['constrained', 'out', 'free']);
-	let modesLoaded = $state(false);
-	$effect(() => {
-		if (!modesLoaded) {
-			modesLoaded = true;
-			try {
-				const raw = localStorage.getItem(MODES_KEY);
-				if (raw) {
-					const a = JSON.parse(raw);
-					if (Array.isArray(a) && a.length) selectedModes = a;
-				}
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		try {
-			localStorage.setItem(MODES_KEY, JSON.stringify(selectedModes));
-		} catch {
-			/* ignore */
-		}
-	});
-	let modeMenuOpen = $state(false);
-	function toggleMode(key: string) {
-		if (selectedModes.includes(key)) {
-			if (selectedModes.length === 1) return; // keep at least one
-			selectedModes = selectedModes.filter((k) => k !== key);
-		} else {
-			selectedModes = [...selectedModes, key];
-		}
-	}
-	const shownModes = $derived(allModes.filter((m) => selectedModes.includes(m.key)));
-	const singleMode = $derived(shownModes.length === 1);
-
-	// Per-objective collapse — default all collapsed, persisted locally.
-	// A section is open only when its key is explicitly false.
-	const COLLAPSE_KEY = 'wobi.watchlist.collapsed';
-	let collapsed = $state<Record<string, boolean>>({});
-	let collapseLoaded = $state(false);
-	$effect(() => {
-		if (!collapseLoaded) {
-			collapseLoaded = true;
-			try {
-				const raw = localStorage.getItem(COLLAPSE_KEY);
-				if (raw) {
-					const o = JSON.parse(raw);
-					if (o && typeof o === 'object') collapsed = o;
-				}
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		try {
-			localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed));
-		} catch {
-			/* ignore */
-		}
-	});
-	const isOpen = (key: string) => collapsed[key] === false;
-	const toggleCollapse = (key: string) => (collapsed[key] = isOpen(key) ? true : false);
-
-	function comboStats(c: TransferCombo) {
-		return [
-			{ label: 'הוצאה', value: `${c.spend} / 120`, tone: 'text-white' },
-			{ label: 'פנוי', value: `${c.remaining}`, tone: 'text-emerald-300' },
-			{ label: 'נק׳ הרכב', value: `${c.points}`, tone: 'text-sky-300' },
-			{ label: 'vlfm', value: c.vlfm.toFixed(2), tone: 'text-violet-300' }
-		];
-	}
-
-	const objSubtitle: Record<string, (c: TransferCombo) => string> = {
-		points: (c) => `${c.points} נק׳ · מערך ${c.formation}`,
-		vlfm: (c) => `vlfm ממוצע ${c.vlfm.toFixed(2)} · פנוי ${c.remaining}`,
-		fixtures: (c) => `קלות לוח מחזור ${c.matchdayEase.toFixed(2)} · ${c.formation}`,
-		fixtures5: (c) => `קלות לוח 5 מחזורים ${c.fixtureEase5.toFixed(2)} · ${c.formation}`,
-		form: (c) => `${c.form} נק׳ במחזור האחרון · ${c.formation}`
-	};
 </script>
 
 <section class="space-y-6">
 	<div>
 		<h1 class="text-2xl font-bold">מעקב</h1>
 		<p class="text-sm text-slate-400">רשימה קבועה + רשימה רלוונטית למחזור הנוכחי.</p>
+		<p class="text-sm text-slate-400">
+			ההרכבים המוצעים, הבחירה מי חייב לצאת / להיכנס וההשוואה בין השיטות — ב־<a
+				href="/strategies"
+				class="text-sky-300 underline">אסטרטגיות</a
+			>. רשימת המחזור כאן היא המאגר שממנו השיטות מכניסות שחקנים.
+		</p>
 	</div>
 
 	<div class="grid gap-6 lg:grid-cols-2">
@@ -272,203 +181,5 @@
 				{/each}
 			</div>
 		</div>
-	</div>
-
-	<div class="space-y-4 border-t border-slate-800 pt-6">
-		<div>
-			<h2 class="text-xl font-bold">הצעות חילופים למחזור {data.currentGw}</h2>
-			<p class="text-sm text-slate-400">
-				עד 3 חילופים מהקבוצה השמורה, כשהנכנסים נלקחים <span class="text-slate-300">רק</span> מרשימת
-				המחזור. שומר על הרכב חוקי, תקציב 120 ומקס׳ 2 מאותה קבוצה. מתעדכן אחרי כל שינוי.
-			</p>
-		</div>
-
-		{#if form?.sketchSaved}
-			<div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
-				סקיצה נשמרה למחזור {form.sketchGw} ✓ ·
-				<a class="underline" href="/sketches?gw={form.sketchGw}">לסקיצות</a>
-			</div>
-		{/if}
-
-		{#if transfers.hasSquad}
-			<!-- Take-out picker -->
-			<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
-				<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-					<h3 class="text-sm font-semibold text-slate-300">
-						בחר עד 3 לשחרר מהקבוצה <span class="text-slate-500">({outSet.size}/{MAX_OUT})</span>
-					</h3>
-					{#if outSet.size}
-						<form method="POST" action="?/clearMustOut" use:enhance>
-							<button type="submit" class="text-xs text-slate-400 hover:text-white">נקה בחירה</button>
-						</form>
-					{/if}
-				</div>
-				<p class="mb-2 text-xs text-slate-500">
-					נשמר למחזור. ההצעות יכריחו את מי שתבחר לצאת; בלי בחירה — יימצאו החילופים הכי משתלמים.
-				</p>
-				<div class="flex flex-wrap gap-1.5">
-					{#each data.squadForPicker as p (p.id)}
-						{@const on = outSet.has(p.id)}
-						<form method="POST" action="?/toggleMustOut" use:enhance>
-							<input type="hidden" name="playerId" value={p.id} />
-							<button
-								type="submit"
-								disabled={!on && outSet.size >= MAX_OUT}
-								class="rounded-lg border px-2 py-1 text-xs transition
-									{on
-									? 'border-red-500/60 bg-red-500/20 text-red-200'
-									: 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-500 disabled:opacity-40'}"
-								title="{posLabel[p.position]} · {p.price}m · {p.points} נק׳"
-							>
-								{on ? '✕ ' : ''}{p.name}
-								<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
-							</button>
-						</form>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Must-come-in picker (persisted per matchday; feeds the recorded what-if) -->
-			<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
-				<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-					<h3 class="text-sm font-semibold text-slate-300">
-						בחר עד 3 שחייבים להיכנס <span class="text-slate-500">({inSet.size}/{MAX_IN})</span>
-					</h3>
-					{#if inSet.size}
-						<form method="POST" action="?/clearMustIn" use:enhance>
-							<button type="submit" class="text-xs text-slate-400 hover:text-white">נקה בחירה</button>
-						</form>
-					{/if}
-				</div>
-				<p class="mb-2 text-xs text-slate-500">
-					מרשימת המחזור. נשמר למחזור ומשפיע גם על מעקב האסטרטגיות — כל שיטה תכלול את מי שתסמן; היתר
-					יימצא אוטומטית.
-				</p>
-				{#if data.inboundForPicker.length}
-					<div class="flex flex-wrap gap-1.5">
-						{#each data.inboundForPicker as p (p.id)}
-							{@const on = inSet.has(p.id)}
-							<form method="POST" action="?/toggleMustIn" use:enhance>
-								<input type="hidden" name="playerId" value={p.id} />
-								<button
-									type="submit"
-									disabled={!on && inSet.size >= MAX_IN}
-									class="rounded-lg border px-2 py-1 text-xs transition
-										{on
-										? 'border-emerald-500/60 bg-emerald-500/20 text-emerald-200'
-										: 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-500 disabled:opacity-40'}"
-									title="{posLabel[p.position]} · {p.price}m · {p.points} נק׳"
-								>
-									{on ? '✓ ' : ''}{p.name}
-									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
-								</button>
-							</form>
-						{/each}
-					</div>
-				{:else}
-					<p class="text-xs text-slate-500">הוסף שחקנים לרשימת המחזור כדי לבחור מי חייב להיכנס.</p>
-				{/if}
-			</div>
-		{/if}
-
-		{#if !transfers.feasible}
-			<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-				<ul class="list-inside list-disc space-y-0.5">
-					{#each transfers.notes as s}
-						<li>{s}</li>
-					{/each}
-				</ul>
-			</div>
-		{:else}
-			{#if transfers.capped}
-				<p class="text-xs text-slate-500">הרשימה גדולה — מוצגות ההצעות הטובות ביותר מתוך חיפוש מוגבל.</p>
-			{/if}
-
-			<!-- Mode filter (persisted locally) -->
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<p class="text-xs text-slate-500">בחר אילו מצבי חילוף להציג.</p>
-				<div class="relative">
-					<button
-						type="button"
-						onclick={() => (modeMenuOpen = !modeMenuOpen)}
-						class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-slate-200"
-					>
-						מצבים ({shownModes.length}) ▾
-					</button>
-					{#if modeMenuOpen}
-						<div
-							class="absolute left-0 z-20 mt-1 min-w-[10rem] rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-lg"
-						>
-							{#each allModes as m (m.key)}
-								<label
-									class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-								>
-									<input
-										type="checkbox"
-										checked={selectedModes.includes(m.key)}
-										onchange={() => toggleMode(m.key)}
-									/>
-									{m.label}
-								</label>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			</div>
-
-			{#snippet card(title: string, o: Obj, v: Variant)}
-				{#if v.combo}
-					<LineupCard
-						{title}
-						subtitle={objSubtitle[o.key]?.(v.combo) ?? null}
-						formation={v.combo.formation}
-						transfersUsed={v.combo.transfersUsed}
-						stats={comboStats(v.combo)}
-						xi={v.combo.xi}
-						bench={v.combo.bench}
-						out={v.combo.out}
-						inn={v.combo.in}
-						actions
-						sketchName={`${o.title} · ${v.modeLabel} · מחזור ${data.currentGw}`}
-						gameweekNumber={data.currentGw}
-					/>
-				{:else}
-					<div
-						class="flex items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-900/40 p-4 text-center text-xs text-slate-500"
-					>
-						{v.modeLabel}: אין הרכב חוקי במצב הזה
-					</div>
-				{/if}
-			{/snippet}
-
-			{#if singleMode}
-				<div class="grid gap-5 lg:grid-cols-3">
-					{#each transfers.byObjective as o (o.key)}
-						{@const v = o.variants.find((x) => x.mode === shownModes[0].key)}
-						{#if v}{@render card(o.title, o, v)}{/if}
-					{/each}
-				</div>
-			{:else}
-				{#each transfers.byObjective as o (o.key)}
-					<div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
-						<button
-							type="button"
-							onclick={() => toggleCollapse(o.key)}
-							class="flex w-full items-center justify-between gap-2 px-4 py-3 text-right text-xl font-bold text-slate-100 hover:bg-slate-800/50"
-						>
-							<span>{o.title}</span>
-							<span class="text-slate-500">{isOpen(o.key) ? '▾' : '▸'}</span>
-						</button>
-						{#if isOpen(o.key)}
-							<div class="grid gap-5 p-3 lg:grid-cols-3">
-								{#each o.variants.filter((v) => selectedModes.includes(v.mode)) as v (v.mode)}
-									{@render card(v.modeLabel, o, v)}
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			{/if}
-		{/if}
 	</div>
 </section>
