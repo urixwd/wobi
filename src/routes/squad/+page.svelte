@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import PriceRangeSlider from '$lib/components/PriceRangeSlider.svelte';
 	import PlayerStatsPanel from '$lib/components/PlayerStatsPanel.svelte';
 	import { positionLabel } from '$lib/positions';
@@ -147,13 +148,16 @@
 			: [...teamFilters, id];
 	}
 
+	const activePlayers = $derived(data.allPlayers.filter((r) => r.player.missingStatus !== 2));
 	const poolPlayers = $derived(
-		data.allPlayers.filter((r) => {
-			if (r.player.missingStatus === 2) return false;
+		activePlayers.filter((r) => {
+			const id = r.player.id;
 			const pts = seasonPoints(r.player) ?? 0;
-			// Hide 0-point players from the table/deciles, unless already in the squad.
-			if (pts <= 0 && !xi.includes(r.player.id) && !bench.includes(r.player.id)) return false;
-			return true;
+			// Hide 0-point players from the table/deciles, unless in the working or saved squad
+			// (so a player you just took out stays findable).
+			return (
+				pts > 0 || xi.includes(id) || bench.includes(id) || savedXi.includes(id) || savedBench.includes(id)
+			);
 		})
 	);
 
@@ -248,7 +252,8 @@
 	}
 
 	const filtered = $derived(
-		poolPlayers
+		// A name search finds anyone active, including 0-point players.
+		(normQuery ? activePlayers : poolPlayers)
 			.filter((r) => {
 				if (posFilter && r.player.position !== posFilter) return false;
 				if (teamFilters.length && !teamFilters.includes(r.player.teamId)) return false;
@@ -385,6 +390,32 @@
 		openStatsId = openStatsId === id ? null : id;
 		if (openStatsId == null) statsPanelPos = null;
 		else statsPanelPos = null; // pitch cards keep relative panels; clear fixed
+	}
+
+	/** Bench player waiting for «who comes out?» (outfield, several XI candidates). */
+	let subBenchId = $state<number | null>(null);
+	const subCandidates = $derived(
+		subBenchId == null ? [] : xi.filter((id) => posOf(id) === posOf(subBenchId!))
+	);
+
+	/** Bench ↔ XI swap. Same position only, so the bench keeps one per position and the shape holds. */
+	function swapIn(benchId: number, xiId: number) {
+		xi = xi.map((x) => (x === xiId ? benchId : x));
+		bench = bench.map((b) => (b === benchId ? xiId : b));
+		subBenchId = null;
+		dropHint = null;
+	}
+
+	function substitute(benchId: number) {
+		openStatsId = null;
+		const candidates = xi.filter((id) => posOf(id) === posOf(benchId));
+		if (!candidates.length) {
+			showHint('אין בהרכב שחקן בעמדה הזו להחליף');
+			return;
+		}
+		// Goalkeeper (or a single option): swap straight away; otherwise ask who comes out.
+		if (candidates.length === 1) swapIn(benchId, candidates[0]);
+		else subBenchId = benchId;
 	}
 
 	function removePlayer(id: number) {
@@ -848,6 +879,17 @@
 										removePlayer(r.player.id);
 									}}
 								>×</button
+								>
+								<button
+									type="button"
+									class="absolute -right-1 -top-1 z-20 flex h-5 w-5 items-center justify-center rounded-md bg-emerald-700/90 text-xs font-bold text-white shadow hover:bg-emerald-600"
+									title="חילוף — הכנס להרכב"
+									aria-label="חילוף — הכנס את {r.player.name} להרכב"
+									onclick={(e) => {
+										e.stopPropagation();
+										substitute(r.player.id);
+									}}
+								>⇄</button
 								>
 								<button
 									type="button"
@@ -1427,4 +1469,38 @@
 			</div>
 		{/if}
 	</section>
+	<Modal
+		open={subBenchId != null}
+		title="מי יוצא במקום {subBenchId != null ? byId.get(subBenchId)?.player.name : ''}?"
+		onclose={() => (subBenchId = null)}
+	>
+		<p class="mb-3 text-xs text-slate-400">
+			השחקן שתבחר יורד לספסל. מוצגים רק שחקני הרכב באותה עמדה, כדי שהספסל יישאר אחד לכל עמדה.
+		</p>
+		<ul class="space-y-1.5">
+			{#each subCandidates as id (id)}
+				{@const r = byId.get(id)}
+				{#if r}
+					<li>
+						<button
+							type="button"
+							class="flex w-full items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-right hover:border-emerald-400/60 hover:bg-slate-800"
+							onclick={() => swapIn(subBenchId!, id)}
+						>
+							{#if r.teamLogo ?? r.player.teamLogoPath}
+								<img src={r.teamLogo ?? r.player.teamLogoPath} alt="" class="h-6 w-6 object-contain" />
+							{/if}
+							<span class="min-w-0 flex-1">
+								<span class="block truncate text-sm font-medium text-slate-100">{r.player.name}</span>
+								<span class="text-[11px] text-slate-400"
+									>{formatPrice(r.player.price)} · {formatPointsLabel(r.player)}</span
+								>
+							</span>
+							<FixtureStrip fixtures={r.upcomingFixtures ?? []} position={r.player.position} slots={3} />
+						</button>
+					</li>
+				{/if}
+			{/each}
+		</ul>
+	</Modal>
 </section>
