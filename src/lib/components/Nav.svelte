@@ -8,7 +8,8 @@
 		{ href: '/watchlist', label: 'מעקב' },
 		/** Visual only — still clickable */
 		{ href: '/options', label: 'אפשרויות קבוצה', looksDisabled: true },
-		{ href: '/strategies', label: 'אסטרטגיות' }
+		{ href: '/strategies', label: 'אסטרטגיות' },
+		{ href: '/difficulty', label: 'קושי יריבים' }
 	];
 
 	function isActive(pathname: string, href: string) {

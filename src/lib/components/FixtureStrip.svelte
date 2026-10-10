@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DIFFICULTY_RING } from '$lib/difficulty';
+	import { DIFFICULTY_RING, difficultyFor } from '$lib/difficulty';
 	import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
 
 	type Props = {
@@ -7,9 +7,11 @@
 		/** Total circles to show (empty placeholders fill the rest). */
 		slots?: number;
 		size?: 'sm' | 'md';
+		/** The player's position (1–4): colours by the vs-defence / vs-attack rating. Absent → overall. */
+		position?: number | null;
 	};
 
-	let { fixtures = [], slots = 5, size = 'sm' }: Props = $props();
+	let { fixtures = [], slots = 5, size = 'sm', position = null }: Props = $props();
 
 	/** Closest first → with dir=rtl the first item sits on the RIGHT. */
 	const shown = $derived(fixtures.slice(0, slots));
@@ -30,7 +32,7 @@
 				title="{fx.isHome ? 'בית' : 'חוץ'} נגד {fx.opponentName} · מחזור {fx.gameweekNumber}"
 			>
 				<div
-					class="flex {dim} items-center justify-center overflow-hidden rounded-full bg-white ring-2 {DIFFICULTY_RING[fx.difficulty]}"
+					class="flex {dim} items-center justify-center overflow-hidden rounded-full bg-white ring-2 {DIFFICULTY_RING[difficultyFor(fx, position)]}"
 				>
 					{#if fx.opponentLogo}
 						<img src={fx.opponentLogo} alt={fx.opponentName} class="{img} object-contain" />

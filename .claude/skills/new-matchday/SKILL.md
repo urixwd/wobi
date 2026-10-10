@@ -88,6 +88,19 @@ curl -s "http://localhost:5174/strategies" | grep -c toggleMust          # >0 = 
 - F shows (0) though it was planned → constraints are checked against the latest `final_squads` **before** F, not live `my_squad`. Don't "fix" it by editing `my_squad` backwards.
 - P's must-in list comes from `watchlist_round[P]`, empty each new matchday — remind Uri to add players on `/watchlist`.
 
+## Opponent difficulty: carried F → P, review on /difficulty
+
+Opponent difficulty is per planning matchday (`team_difficulty`: `overall`, `vs_def` for our GK/DEF, `vs_att` for our MID/ATT). Every upcoming fixture is coloured with the **planning** matchday's ratings, not the fixture's own gameweek.
+
+- **Carry-forward is automatic.** `db:import-fixtures` (which sets `is_current = P`) copies F's ratings into P when P has no rows yet (`ensureDifficultyForGw` in `src/lib/server/teamDifficulty.ts`; first load of `/difficulty` does the same). It never overwrites existing rows.
+- **Review/adjust** on `/difficulty` (defaults to P, one click per cell saves). Remind Uri to go over the 14 teams before planning transfers.
+- **F stays as its log.** `/difficulty?gw=F` is read-only — the ratings in effect while F was planned. Don't edit them.
+
+```bash
+psql "$DB" -c "SELECT gameweek_number, count(*) FROM team_difficulty GROUP BY 1 ORDER BY 1;"   # P = 14
+curl -s "http://localhost:5174/difficulty?gw=<F>" | grep -c '?/set'   # 0 = read-only
+```
+
 ## Save + push (two commits)
 
 ```bash
@@ -115,3 +128,4 @@ Start the dev server and report the URL.
 - Commit `.env`, `incoming/`, or any player JSON.
 - Delete previous gameweeks' snapshots — every round is kept.
 - Edit a finished matchday's constraints (`final_squads[F]`) — they're a permanent log.
+- Edit a finished matchday's opponent difficulty (`team_difficulty[F]`) — same, a permanent log.

@@ -7,7 +7,7 @@
 		playerStatLines,
 		seasonPoints
 	} from '$lib/stats';
-	import { DIFFICULTY_BG, DIFFICULTY_LABEL, DIFFICULTY_RING } from '$lib/difficulty';
+	import { DIFFICULTY_BG, DIFFICULTY_LABEL, DIFFICULTY_RING, difficultyFor } from '$lib/difficulty';
 	import type { FixtureDifficulty } from '$lib/server/db/schema';
 	import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
 	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
@@ -26,6 +26,10 @@
 		playerStats?: Statsish | null;
 		points?: number | null;
 		logoPath?: string | null;
+		/**
+		 * Fallback next-opponent difficulty. When `upcomingFixtures` is non-empty the
+		 * next fixture rated for `position` (difficultyFor) wins.
+		 */
 		difficulty?: FixtureDifficulty | null;
 		injured?: boolean;
 		expelled?: boolean;
@@ -54,6 +58,11 @@
 	}: Props = $props();
 
 	let open = $state(false);
+
+	/** Next opponent, rated for this player's position (falls back to the `difficulty` prop). */
+	const nextDifficulty = $derived(
+		upcomingFixtures[0] ? difficultyFor(upcomingFixtures[0], position) : difficulty
+	);
 
 	const label = $derived(
 		playerStats ? formatPointsLabel(playerStats) : `${points ?? 0} נק׳`
@@ -96,7 +105,7 @@
 	>
 		<div
 			class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-800 ring-2
-				{difficulty ? DIFFICULTY_RING[difficulty] : 'ring-slate-700'}"
+				{nextDifficulty ? DIFFICULTY_RING[nextDifficulty] : 'ring-slate-700'}"
 		>
 			{#if logoPath}
 				<img src={logoPath} alt="" class="h-8 w-8 object-contain" />
@@ -111,7 +120,7 @@
 				{#if teamName}· {teamName}{/if}
 			</div>
 			<div class="mt-1">
-				<FixtureStrip fixtures={upcomingFixtures} />
+				<FixtureStrip fixtures={upcomingFixtures} {position} />
 			</div>
 		</div>
 		<div class="flex shrink-0 flex-col items-end gap-1 text-xs">
@@ -121,8 +130,8 @@
 					>{label}</span
 				>
 			</div>
-			{#if difficulty}
-				<span class="rounded px-1.5 py-0.5 {DIFFICULTY_BG[difficulty]}">{DIFFICULTY_LABEL[difficulty]}</span>
+			{#if nextDifficulty}
+				<span class="rounded px-1.5 py-0.5 {DIFFICULTY_BG[nextDifficulty]}">{DIFFICULTY_LABEL[nextDifficulty]}</span>
 			{/if}
 			<div class="flex gap-1">
 				{#if injured}<span class="text-red-400" title="פצוע">🤕</span>{/if}

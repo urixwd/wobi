@@ -30,6 +30,30 @@ export const teams = pgTable('teams', {
 	difficulty: text('difficulty').$type<FixtureDifficulty>().notNull().default('green')
 });
 
+/**
+ * Per-matchday opponent difficulty. Each row rates team `teamId` AS AN OPPONENT
+ * for planning matchday `gameweekNumber` (the ratings in effect while that
+ * matchday was open — not the fixture's own gameweek). Carried forward from the
+ * previous matchday when a new one opens (see $lib/server/teamDifficulty.ts).
+ */
+export const teamDifficulty = pgTable(
+	'team_difficulty',
+	{
+		id: serial('id').primaryKey(),
+		gameweekNumber: integer('gameweek_number').notNull(),
+		/** Sport5 team id (same as teams.id) */
+		teamId: integer('team_id').notNull(),
+		/** Team-level rating (used where there's no position, e.g. "משחקי מחזור") */
+		overall: text('overall').$type<FixtureDifficulty>().notNull(),
+		/** For OUR goalkeepers + defenders (positions 1,2) — i.e. this team's attack strength */
+		vsDef: text('vs_def').$type<FixtureDifficulty>().notNull(),
+		/** For OUR midfielders + attackers (positions 3,4) — i.e. this team's defensive strength */
+		vsAtt: text('vs_att').$type<FixtureDifficulty>().notNull(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('team_difficulty_gw_team_uidx').on(t.gameweekNumber, t.teamId)]
+);
+
 export const players = pgTable('players', {
 	id: integer('id').primaryKey(),
 	teamId: integer('team_id')
@@ -255,3 +279,4 @@ export type PlayerRoundStats = typeof playerRoundStats.$inferSelect;
 export type PlayerSnapshot = typeof playerSnapshots.$inferSelect;
 export type StrategyPick = typeof strategyPicks.$inferSelect;
 export type MatchdayPlan = typeof matchdayPlan.$inferSelect;
+export type TeamDifficulty = typeof teamDifficulty.$inferSelect;

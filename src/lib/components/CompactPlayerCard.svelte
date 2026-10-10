@@ -10,6 +10,8 @@
 		logo?: string | null;
 		teamName?: string | null;
 		upcomingFixtures?: UpcomingFixture[];
+		/** Player position (1–4) — fixture rings use the position-specific rating. */
+		position?: number | null;
 		/** Bench variant: show position label on top */
 		positionLabel?: string | null;
 		variant?: 'xi' | 'bench';
@@ -22,6 +24,7 @@
 		logo = null,
 		teamName = null,
 		upcomingFixtures = [],
+		position = null,
 		positionLabel = null,
 		variant = 'xi'
 	}: Props = $props();
@@ -57,7 +60,7 @@
 		<div class="text-[10px] text-amber-200/90">{formatPrice(price)}</div>
 		<div class="text-[10px] text-sky-300/90">{points} נק׳</div>
 		<div class="mt-0.5 flex justify-center">
-			<FixtureStrip fixtures={upcomingFixtures} size="sm" />
+			<FixtureStrip fixtures={upcomingFixtures} {position} size="sm" />
 		</div>
 	</div>
 {/if}

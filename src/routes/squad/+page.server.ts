@@ -3,6 +3,7 @@ import { asc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { finalSquads, fixtures, gameweeks, mySquad, players, sketches, teams } from '$lib/server/db/schema';
 import { recordWhatIf } from '$lib/server/strategyTracking';
+import { getDifficultyRatings } from '$lib/server/teamDifficulty';
 import {
 	attachUpcoming,
 	getUpcomingFixturesByTeamIds,
@@ -40,31 +41,38 @@ export const load: PageServerLoad = async ({ url }) => {
 		.select({
 			player: players,
 			teamName: teams.name,
-			teamLogo: teams.logoPath,
-			difficulty: teams.difficulty
+			teamLogo: teams.logoPath
 		})
 		.from(players)
 		.leftJoin(teams, eq(players.teamId, teams.id))
 		.orderBy(asc(players.position), asc(players.name));
 
+	// This matchday's opponent ratings (team_difficulty). `difficulty` on a player row is
+	// his TEAM's overall rating as an opponent (team-level filter grouping only).
+	const ratings = await getDifficultyRatings(currentGw);
+	const overallOf = (teamId: number) => ratings.get(teamId)?.overall ?? 'green';
+	const withTeamDifficulty = <T extends { player: { teamId: number } }>(rows: T[]) =>
+		rows.map((r) => ({ ...r, difficulty: overallOf(r.player.teamId) }));
+
 	const teamIds = allPlayersRaw.map((r) => r.player.teamId);
-	const upcomingByTeam = await getUpcomingFixturesByTeamIds(teamIds, currentGw, 5);
-	const allPlayers = attachUpcoming(allPlayersRaw, upcomingByTeam);
+	const upcomingByTeam = await getUpcomingFixturesByTeamIds(teamIds, currentGw, 5, currentGw);
+	const allPlayers = attachUpcoming(withTeamDifficulty(allPlayersRaw), upcomingByTeam);
 
 	const ids = [...squad.xiPlayerIds, ...squad.benchPlayerIds];
 	const selected =
 		ids.length > 0
 			? attachUpcoming(
-					await db
-						.select({
-							player: players,
-							teamName: teams.name,
-							teamLogo: teams.logoPath,
-							difficulty: teams.difficulty
-						})
-						.from(players)
-						.leftJoin(teams, eq(players.teamId, teams.id))
-						.where(inArray(players.id, ids)),
+					withTeamDifficulty(
+						await db
+							.select({
+								player: players,
+								teamName: teams.name,
+								teamLogo: teams.logoPath
+							})
+							.from(players)
+							.leftJoin(teams, eq(players.teamId, teams.id))
+							.where(inArray(players.id, ids))
+					),
 					upcomingByTeam
 				)
 			: [];
@@ -101,13 +109,13 @@ export const load: PageServerLoad = async ({ url }) => {
 					id: home.id,
 					name: home.name,
 					logoPath: home.logoPath,
-					difficulty: home.difficulty
+					difficulty: overallOf(home.id)
 				},
 				away: {
 					id: away.id,
 					name: away.name,
 					logoPath: away.logoPath,
-					difficulty: away.difficulty
+					difficulty: overallOf(away.id)
 				}
 			}
 		];

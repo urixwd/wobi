@@ -10,6 +10,7 @@ import { resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { createDb } from '../src/lib/server/db/client';
 import { fixtures, gameweeks } from '../src/lib/server/db/schema';
+import { ensureDifficultyForGw } from '../src/lib/server/teamDifficulty';
 
 
 const CURRENT_ROUND = 4;
@@ -57,6 +58,11 @@ async function main() {
 		// Clear isCurrent on non-current
 		await db.update(gameweeks).set({ isCurrent: false }).where(eq(gameweeks.isCurrent, true));
 		await db.update(gameweeks).set({ isCurrent: true }).where(eq(gameweeks.number, currentRound));
+
+		// Opponent difficulty for the open matchday: carry forward the previous matchday's
+		// ratings (no-op when it already has rows). Review/adjust them on /difficulty.
+		const carried = await ensureDifficultyForGw(currentRound, db);
+		if (carried) console.log(`Opponent difficulty: carried ${carried} team ratings into GW${currentRound}`);
 
 		const allGw = await db.select().from(gameweeks);
 		const byNumber = new Map(allGw.map((g) => [g.number, g.id]));

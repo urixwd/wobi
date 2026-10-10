@@ -6,11 +6,17 @@ import {
 	teams,
 	type FixtureDifficulty
 } from '$lib/server/db/schema';
+import { getDifficultyRatings } from '$lib/server/teamDifficulty';
 
 export type UpcomingFixture = {
 	opponentLogo: string | null;
 	opponentName: string;
+	/** Opponent's overall rating (team-level, no position). */
 	difficulty: FixtureDifficulty;
+	/** Opponent's rating for our GK + defenders (positions 1,2). */
+	difficultyDef: FixtureDifficulty;
+	/** Opponent's rating for our midfielders + attackers (positions 3,4). */
+	difficultyAtt: FixtureDifficulty;
 	isHome: boolean;
 	gameweekNumber: number;
 };
@@ -28,12 +34,14 @@ export async function resolveCurrentGwNumber(fallback = 4): Promise<number> {
 
 /**
  * For each teamId, return up to `limit` upcoming fixtures starting from fromGameweek
- * (inclusive), ordered closest-first (ascending gameweek number).
+ * (inclusive), ordered closest-first (ascending gameweek number). Opponent ratings
+ * come from planning matchday `ratingsGw` (default: fromGameweek) — see teamDifficulty.ts.
  */
 export async function getUpcomingFixturesByTeamIds(
 	teamIds: number[],
 	fromGameweek: number,
-	limit = 5
+	limit = 5,
+	ratingsGw = fromGameweek
 ): Promise<Map<number, UpcomingFixture[]>> {
 	const result = new Map<number, UpcomingFixture[]>();
 	const unique = [...new Set(teamIds.filter((id) => Number.isFinite(id) && id > 0))];
@@ -43,6 +51,15 @@ export async function getUpcomingFixturesByTeamIds(
 	const from = Math.max(MIN_GW, fromGameweek);
 	const allTeams = await db.select().from(teams);
 	const teamsById = new Map(allTeams.map((t) => [t.id, t]));
+	const ratings = await getDifficultyRatings(ratingsGw);
+	const rate = (t: (typeof allTeams)[number]) => {
+		const r = ratings.get(t.id);
+		return {
+			difficulty: r?.overall ?? t.difficulty,
+			difficultyDef: r?.vsDef ?? t.difficulty,
+			difficultyAtt: r?.vsAtt ?? t.difficulty
+		};
+	};
 
 	const fixtureRows = await db
 		.select({
@@ -72,7 +89,7 @@ export async function getUpcomingFixturesByTeamIds(
 				list.push({
 					opponentLogo: away.logoPath,
 					opponentName: away.name,
-					difficulty: away.difficulty,
+					...rate(away),
 					isHome: true,
 					gameweekNumber: f.gwNumber
 				});
@@ -84,7 +101,7 @@ export async function getUpcomingFixturesByTeamIds(
 				list.push({
 					opponentLogo: home.logoPath,
 					opponentName: home.name,
-					difficulty: home.difficulty,
+					...rate(home),
 					isHome: false,
 					gameweekNumber: f.gwNumber
 				});

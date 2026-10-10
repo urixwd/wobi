@@ -8,7 +8,10 @@
 	import {
 		DIFFICULTY_BG,
 		DIFFICULTY_LABEL,
+		DIFFICULTY_LEVELS,
 		DIFFICULTY_RING,
+		DIFFICULTY_SCORE,
+		difficultyFor,
 		fixtureRunAverage,
 		fixtureRunBucket,
 		formatFixtureRun
@@ -125,7 +128,7 @@
 						id: r.player.teamId,
 						name: r.teamName as string,
 						logo: (r.teamLogo ?? r.player.teamLogoPath) as string | null,
-						difficulty: (r.difficulty ?? 'green') as FixtureDifficulty
+						difficulty: r.difficulty as FixtureDifficulty
 					}
 				])
 		).values()].sort((a, b) => a.name.localeCompare(b.name, 'he'))
@@ -154,9 +157,10 @@
 		})
 	);
 
-	const DIFF_ORDER: FixtureDifficulty[] = ['green', 'yellow', 'red'];
-
-	/** One row per team with next-opp + 5-game run difficulty (from any player on that team). */
+	/**
+	 * One row per team with next-opp + 5-game run difficulty (from any player on that team).
+	 * Team-level (selects teams, not players) → opponents' OVERALL rating, no position.
+	 */
 	const teamsWithFixtures = $derived.by(() => {
 		const map = new Map<
 			number,
@@ -203,14 +207,15 @@
 
 	const pointsDeciles = $derived(buildPointsDeciles(poolPlayers.map((r) => r.player)));
 
-	const DIFF_RANK: Record<FixtureDifficulty, number> = { green: 1, yellow: 2, red: 3 };
-
+	/** Per-player: the next opponent rated for this player's position. */
 	function nextOppDiff(r: (typeof data.allPlayers)[number]): FixtureDifficulty | null {
-		return r.upcomingFixtures?.[0]?.difficulty ?? null;
+		const fx = r.upcomingFixtures?.[0];
+		return fx ? difficultyFor(fx, r.player.position) : null;
 	}
 
+	/** Per-player: 5-game run rated for this player's position. */
 	function runAvg(r: (typeof data.allPlayers)[number]): number | null {
-		return fixtureRunAverage(r.upcomingFixtures, 5);
+		return fixtureRunAverage(r.upcomingFixtures, 5, r.player.position);
 	}
 
 	function runDiff(r: (typeof data.allPlayers)[number]): FixtureDifficulty | null {
@@ -283,7 +288,7 @@
 				} else if (sortCol === 'nextDiff') {
 					const da = nextOppDiff(a);
 					const db = nextOppDiff(b);
-					cmp = (da ? DIFF_RANK[da] : 0) - (db ? DIFF_RANK[db] : 0);
+					cmp = (da ? DIFFICULTY_SCORE[da] : 0) - (db ? DIFFICULTY_SCORE[db] : 0);
 				} else if (sortCol === 'runDiff') {
 					cmp = (runAvg(a) ?? 99) - (runAvg(b) ?? 99);
 				}
@@ -790,7 +795,7 @@
 												<span class="rounded px-1 py-0.5 text-[9px] {d.className}">{d.label}</span>
 											{/if}
 											<div class="mt-1 w-full overflow-visible">
-												<FixtureStrip fixtures={r.upcomingFixtures ?? []} slots={5} />
+												<FixtureStrip fixtures={r.upcomingFixtures ?? []} slots={5} position={r.player.position} />
 											</div>
 										</button>
 										{#if openStatsId === r.player.id}
@@ -869,7 +874,7 @@
 										>{formatPointsLabel(r.player)}</span
 									>
 									<div class="mt-0.5 w-full overflow-visible">
-										<FixtureStrip fixtures={r.upcomingFixtures ?? []} />
+										<FixtureStrip fixtures={r.upcomingFixtures ?? []} position={r.player.position} />
 									</div>
 								</button>
 								{#if openStatsId === r.player.id}
@@ -953,7 +958,7 @@
 				<div class="text-slate-400" title="המשחק הקרוב ביותר">
 					יריבה קרובה — לחיצה על סמל = בחירת קבוצה
 				</div>
-				{#each DIFF_ORDER as d}
+				{#each DIFFICULTY_LEVELS as d}
 					{@const teams = teamsForNextOpp(d)}
 					<div class="flex flex-wrap items-center gap-1.5">
 						<button
@@ -1010,7 +1015,7 @@
 					>?</button
 					>
 				</div>
-				{#each DIFF_ORDER as d}
+				{#each DIFFICULTY_LEVELS as d}
 					{@const teams = teamsForRun(d)}
 					<div class="flex flex-wrap items-center gap-1.5">
 						<button
@@ -1301,7 +1306,7 @@
 								</td>
 								<td class="p-2">
 									{#if r.upcomingFixtures?.[0]}
-										<FixtureStrip fixtures={[r.upcomingFixtures[0]]} slots={1} />
+										<FixtureStrip fixtures={[r.upcomingFixtures[0]]} slots={1} position={r.player.position} />
 									{:else}
 										<span class="text-slate-600">—</span>
 									{/if}
@@ -1318,7 +1323,7 @@
 												<span class="opacity-70">({formatFixtureRun(runAvg(r))})</span>
 											</span>
 										{/if}
-										<FixtureStrip fixtures={r.upcomingFixtures ?? []} slots={5} />
+										<FixtureStrip fixtures={r.upcomingFixtures ?? []} slots={5} position={r.player.position} />
 									</div>
 								</td>
 							</tr>
