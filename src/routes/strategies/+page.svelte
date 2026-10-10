@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import LineupCard from '$lib/components/LineupCard.svelte';
+	import { formatPrice } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -46,7 +47,7 @@
 		form: 'סכום הנקודות ש־11 השחקנים צברו במחזור האחרון בלבד. נבחר ההרכב עם הסכום הגבוה ביותר; בשוויון — יותר נקודות עונה.'
 	};
 	const HOW_COMMON =
-		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה. בשיטות הלוח, קושי היריב תלוי בעמדת השחקן — שוער והגנה מול התקפת היריב, קישור והתקפה מול הגנת היריב — ונקבע לכל מחזור ב־/difficulty. מצבים: «מוגבל» מכבד את «לשחרר», «עדיף לא להוציא» ו«חייבים להיכנס»; «יציאה בלבד» את «לשחרר» ו«עדיף לא להוציא»; «חופשי» אף אחד.';
+		'בכל השיטות: עד 3 חילופים, הנכנסים רק מרשימת המחזור, תקציב 120, עד 2 שחקנים מאותה קבוצה והרכב חוקי. הספסל — השחקן הטוב ביותר לפי אותו מדד בכל עמדה. בשיטות הלוח, קושי היריב תלוי בעמדת השחקן — שוער והגנה מול התקפת היריב, קישור והתקפה מול הגנת היריב — ונקבע לכל מחזור ב־/difficulty. מצבים: «מוגבל» מכבד את «לשחרר», «עדיף לא להוציא» ו«חייבים להיכנס»; «יציאה בלבד» את «לשחרר» ו«עדיף לא להוציא»; «חופשי» אף אחד. «ספסל בלבד» חל בכל המצבים: שחקן כזה לא פותח אם יש הרכב חוקי בלעדיו.';
 
 	const MODE_TABS = [
 		{ key: 'constrained', label: 'מוגבל' },
@@ -112,6 +113,41 @@
 		}
 	});
 	const isRowOpen = (key: string) => openRows[key] ?? key === 'actual';
+
+	// Lineups view: all modes (accordion) or «מוגבל בלבד» (flat), remembered locally.
+	type PickView = 'all' | 'constrained';
+	const VIEW_KEY = 'wobi.strategies.view';
+	let pickView = $state<PickView>('all');
+	let viewLoaded = $state(false);
+	$effect(() => {
+		if (!viewLoaded) {
+			viewLoaded = true;
+			try {
+				const v = localStorage.getItem(VIEW_KEY);
+				if (v === 'all' || v === 'constrained') pickView = v;
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		try {
+			localStorage.setItem(VIEW_KEY, pickView);
+		} catch {
+			/* ignore */
+		}
+	});
+	/** Card whose constraint-warning details are open (click); hover shows a tooltip. */
+	let warnOpen = $state<string | null>(null);
+	const warnTitle = (v: { text: string; players: string[] }[]) =>
+		v.map((x) => `${x.text}: ${x.players.join(', ')}`).join('\n');
+	const constrainedPicks = $derived(
+		(detail?.picks ?? []).filter((p) => p.strategy === 'actual' || p.mode === 'constrained')
+	);
+	/** Suggestions in the current view that miss a constraint. */
+	const unmetCount = $derived(
+		(pickView === 'constrained' ? constrainedPicks : (detail?.picks ?? [])).filter((p) => p.violations.length)
+			.length
+	);
 	const toggleRow = (key: string) => (openRows[key] = !isRowOpen(key));
 
 	// Leaderboard view: season total, or one scored matchday (default: the latest).
@@ -232,6 +268,8 @@
 		{@const outIds = new Set(c.forcedOut)}
 		{@const inIds = new Set(c.forcedIn)}
 		{@const keepIds = new Set(c.preferKeep)}
+		{@const benchIds = new Set(c.benchOnly)}
+		{@const suggestIds = new Set(c.suggestBenchOnly)}
 		<div class="space-y-3">
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<div>
@@ -287,13 +325,13 @@
 										disabled={!on && outIds.size >= 3}
 										class="{cls} transition hover:border-slate-500 disabled:opacity-40"
 									>
-										{on ? '✕ ' : ''}{p.name}
+										{on ? '✕ ' : ''}{p.name} <span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
 										<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 									</button>
 								</form>
 							{:else}
 								<span class={cls}>
-									{on ? '✕ ' : ''}{p.name}
+									{on ? '✕ ' : ''}{p.name} <span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
 									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 								</span>
 							{/if}
@@ -323,13 +361,13 @@
 										class="{cls} transition hover:border-slate-500"
 										title={outIds.has(p.id) ? 'מסומן לשחרור — לחיצה תעביר אותו לכאן' : undefined}
 									>
-										{on ? '🛡 ' : ''}{p.name}
+										{on ? '🛡 ' : ''}{p.name} <span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
 										<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 									</button>
 								</form>
 							{:else}
 								<span class={cls}>
-									{on ? '🛡 ' : ''}{p.name}
+									{on ? '🛡 ' : ''}{p.name} <span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
 									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 								</span>
 							{/if}
@@ -354,13 +392,13 @@
 										disabled={!on && inIds.size >= 3}
 										class="{cls} transition hover:border-slate-500 disabled:opacity-40"
 									>
-										{on ? '✓ ' : ''}{p.name}
+										{on ? '✓ ' : ''}{p.name} <span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
 										<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 									</button>
 								</form>
 							{:else}
 								<span class={cls}>
-									{on ? '✓ ' : ''}{p.name}
+									{on ? '✓ ' : ''}{p.name} <span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
 									<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
 								</span>
 							{/if}
@@ -374,6 +412,134 @@
 				</div>
 			</div>
 
+			{#if detail.live}
+				<!-- «ספסל בלבד»: per player (not per matchday), squad + round list -->
+				<div class="rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
+					<h3 class="mb-1 text-sm font-semibold text-slate-300">
+						ספסל בלבד <span class="text-slate-500">({c.benchOnly.length})</span>
+					</h3>
+					<p class="mb-2 text-[11px] text-slate-500">
+						שחקנים שלא פותחים (למשל שוער מחליף). השיטות ו־/options ישימו אותם רק בספסל, אלא אם אין הרכב
+						חוקי בלעדיהם. נשמר לשחקן — לא למחזור. המספרים: דקות ב־3 המחזורים האחרונים; מסומנים
+						<span class="text-amber-300">כהצעה</span> מי ששיחקו 0 דקות בכולם.
+					</p>
+					{#each [{ label: 'מהסגל', list: c.squad }, { label: 'מרשימת המחזור', list: c.inbound }] as grp (grp.label)}
+						{#if grp.list.length}
+							<div class="mb-1 mt-2 text-[11px] text-slate-500">{grp.label}</div>
+							<div class="flex flex-wrap gap-1.5">
+								{#each grp.list as p (p.id)}
+									{@const on = benchIds.has(p.id)}
+									{@const suggested = suggestIds.has(p.id)}
+									{@const mins = c.minutes[p.id]}
+									<form method="POST" action="?/toggleBenchOnly" use:enhance>
+										<input type="hidden" name="playerId" value={p.id} />
+										<button
+											type="submit"
+											class="rounded-lg border px-2 py-1 text-xs transition hover:border-slate-500 {on
+												? 'border-violet-500/60 bg-violet-500/20 text-violet-200'
+												: suggested
+													? 'border-dashed border-amber-400/70 bg-amber-500/10 text-amber-200'
+													: 'border-slate-700 bg-slate-800/60 text-slate-400'}"
+											title={suggested ? 'הצעה: 0 דקות במחזורים האחרונים' : undefined}
+										>
+											{on ? '🪑 ' : ''}{p.name}
+											<span class="tabular-nums text-slate-400">({p.points} · {formatPrice(p.price)})</span>
+											<span class="text-[10px] text-slate-500">{posLabel[p.position]}</span>
+											{#if mins?.length}
+												<span class="text-[10px] tabular-nums text-slate-500">· {mins.join('/')}′</span>
+											{/if}
+										</button>
+									</form>
+								{/each}
+							</div>
+						{/if}
+					{/each}
+				</div>
+			{/if}
+
+			{#snippet pickCard(p: NonNullable<typeof detail>['picks'][number])}
+				<LineupCard
+					title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
+					badge={p.points != null ? `${p.points} נק׳` : 'טרם דורג'}
+					formation={p.formation ?? '—'}
+					subtitle={p.metrics && objScore[p.objective] ? objScore[p.objective](p.metrics) : null}
+					stats={cardStats(p.spend, p.metrics)}
+					xi={p.xi}
+					bench={p.bench}
+					out={p.out}
+					inn={p.in}
+					diffLabel={detail.baseFromGw != null
+						? `חילופים מול הקבוצה של מחזור ${detail.baseFromGw}`
+						: 'חילופים מול הקבוצה השמורה'}
+					actions={detail.live}
+					sketchName={`${p.label}${p.modeLabel ? ` · ${p.modeLabel}` : ''} · מחזור ${detail.gameweekNumber}`}
+					gameweekNumber={detail.gameweekNumber}
+				>
+				{#snippet badges()}
+					{#if p.violations.length}
+						<span class="relative">
+							<button
+								type="button"
+								class="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/30"
+								title={warnTitle(p.violations)}
+								aria-expanded={warnOpen === p.strategy}
+								onclick={() => (warnOpen = warnOpen === p.strategy ? null : p.strategy)}
+								>⚠ אילוצים ({p.violations.reduce((n, v) => n + v.players.length, 0)})</button
+							>
+							{#if warnOpen === p.strategy}
+								<div
+									class="absolute left-0 top-full z-30 mt-1 w-72 max-w-[80vw] rounded-xl border border-amber-500/40 bg-slate-950 p-3 text-right text-xs shadow-2xl"
+								>
+									<div class="mb-1.5 font-semibold text-amber-200">לא עומד באילוצים:</div>
+									<ul class="space-y-1.5">
+										{#each p.violations as v (v.kind)}
+											<li>
+												<div class="text-slate-300">{v.text}</div>
+												<div class="text-amber-200">{v.players.join(' · ')}</div>
+											</li>
+										{/each}
+									</ul>
+								</div>
+							{/if}
+						</span>
+					{/if}
+				{/snippet}
+			</LineupCard>
+			{/snippet}
+
+			{#if unmetCount}
+				<div class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
+					⚠ {unmetCount === 1 ? 'הצעה אחת לא עומדת' : `${unmetCount} הצעות לא עומדות`} בכל האילוצים. הכרטיסים
+					מסומנים ב־«⚠ אילוצים» — מעבר עכבר או לחיצה לפירוט.
+				</div>
+			{/if}
+
+			<!-- View: every mode in collapsible rows, or «מוגבל בלבד» as one flat grid -->
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<h3 class="text-sm font-semibold text-slate-300">הרכבים</h3>
+				<div class="flex gap-1">
+					{#each [{ key: 'all', label: 'כל המצבים' }, { key: 'constrained', label: 'מוגבל בלבד' }] as v (v.key)}
+						<button
+							type="button"
+							onclick={() => (pickView = v.key as PickView)}
+							class="rounded-lg px-2.5 py-1 text-xs {pickView === v.key
+								? 'bg-sky-500/20 text-sky-300'
+								: 'bg-slate-800 text-slate-400'}">{v.label}</button
+						>
+					{/each}
+				</div>
+			</div>
+
+			{#if pickView === 'constrained'}
+				<p class="text-xs text-slate-500">
+					הבחירה שלך + ההרכב של כל שיטה במצב «מוגבל» (מכבד את «לשחרר», «עדיף לא להוציא» ו«חייבים להיכנס»).
+				</p>
+				<div class="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+					{#each constrainedPicks as p (p.strategy)}
+						{@render pickCard(p)}
+					{/each}
+				</div>
+			{:else}
 			<!-- One collapsible row per strategy; its 3 modes side by side from xl (≈ /options card width at full page width) -->
 			<div class="space-y-3">
 				{#each pickGroups as g (g.key)}
@@ -392,6 +558,15 @@
 								</span>
 							</span>
 							<span class="flex items-center gap-2">
+								{#if g.picks.some((p) => p.violations.length)}
+									<span
+										class="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300"
+										title={g.picks
+											.filter((p) => p.violations.length)
+											.map((p) => `${p.modeLabel}:\n${warnTitle(p.violations)}`)
+											.join('\n\n')}>⚠</span
+									>
+								{/if}
 								{#each g.picks as p (p.strategy)}
 									{#if p.points != null}
 										<span class="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
@@ -412,29 +587,14 @@
 							{/if}
 							<div class="grid grid-cols-1 gap-5 p-3 xl:grid-cols-3">
 								{#each g.picks as p (p.strategy)}
-									<LineupCard
-										title={p.mode ? `${p.label} · ${p.modeLabel}` : p.label}
-										badge={p.points != null ? `${p.points} נק׳` : 'טרם דורג'}
-										formation={p.formation ?? '—'}
-										subtitle={p.metrics && objScore[p.objective] ? objScore[p.objective](p.metrics) : null}
-										stats={cardStats(p.spend, p.metrics)}
-										xi={p.xi}
-										bench={p.bench}
-										out={p.out}
-										inn={p.in}
-										diffLabel={detail.baseFromGw != null
-											? `חילופים מול הקבוצה של מחזור ${detail.baseFromGw}`
-											: 'חילופים מול הקבוצה השמורה'}
-										actions={detail.live}
-										sketchName={`${p.label}${p.modeLabel ? ` · ${p.modeLabel}` : ''} · מחזור ${detail.gameweekNumber}`}
-										gameweekNumber={detail.gameweekNumber}
-									/>
+									{@render pickCard(p)}
 								{/each}
 							</div>
 						{/if}
 					</div>
 				{/each}
 			</div>
+			{/if}
 		</div>
 	{/if}
 

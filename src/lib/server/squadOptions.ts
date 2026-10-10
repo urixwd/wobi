@@ -41,6 +41,8 @@ export type OptionPlayer = {
 	fixtureEase: number;
 	logo: string | null;
 	upcomingFixtures: UpcomingFixture[];
+	/** «ספסל בלבד»: only starts when no legal XI avoids it. */
+	benchOnly?: boolean;
 };
 
 export type SquadOption = {
@@ -70,6 +72,7 @@ export function toOptionPlayer(raw: {
 	upcomingFixtures: UpcomingFixture[];
 	lastRoundPlayerStats?: unknown;
 	lastSeasonPlayerStats?: unknown;
+	benchOnly?: boolean;
 }): OptionPlayer {
 	const pts = seasonPoints(raw) ?? 0;
 	const v = vlfm(raw) ?? 0;
@@ -85,7 +88,8 @@ export function toOptionPlayer(raw: {
 		// Next-3 ease, rated for this player's position (shared scale).
 		fixtureEase: fixtureEase(raw.upcomingFixtures, raw.position, 3),
 		logo: raw.logo,
-		upcomingFixtures: raw.upcomingFixtures ?? []
+		upcomingFixtures: raw.upcomingFixtures ?? [],
+		benchOnly: raw.benchOnly ?? false
 	};
 }
 
@@ -124,8 +128,11 @@ function arrangeSquad(
 
 	const byPos: Record<number, OptionPlayer[]> = { 1: [], 2: [], 3: [], 4: [] };
 	for (const p of squad15) byPos[p.position]?.push(p);
+	// Bench-only players sort last, so a shape only starts them when it runs out of others.
 	for (const pos of [1, 2, 3, 4]) {
-		byPos[pos].sort((a, b) => score(b) - score(a) || b.points - a.points);
+		byPos[pos].sort(
+			(a, b) => Number(!!a.benchOnly) - Number(!!b.benchOnly) || score(b) - score(a) || b.points - a.points
+		);
 	}
 
 	const feasible = XI_SHAPES.filter(
@@ -142,6 +149,7 @@ function arrangeSquad(
 				xi: OptionPlayer[];
 				bench: OptionPlayer[];
 				sc: number;
+				starters: number;
 		  }
 		| null = null;
 
@@ -169,7 +177,9 @@ function arrangeSquad(
 		}
 		if (!ok || xi.length !== 11 || bench.length !== 4) continue;
 		const sc = xi.reduce((a, p) => a + score(p), 0) * 2 + bench.reduce((a, p) => a + score(p) * 0.35, 0);
-		if (!best || sc > best.sc) best = { xi, bench, sc };
+		const starters = xi.filter((p) => p.benchOnly).length; // fewer bench-only starters wins first
+		if (!best || starters < best.starters || (starters === best.starters && sc > best.sc))
+			best = { xi, bench, sc, starters };
 	}
 
 	return best ? { xi: best.xi, bench: best.bench } : null;

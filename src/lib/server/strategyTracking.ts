@@ -30,7 +30,9 @@ import {
 } from '$lib/server/upcomingFixtures';
 import { fixtureEase, matchdayEase } from '$lib/difficulty';
 import { formationLabel } from '$lib/positions';
-import { transferDiff } from '$lib/transfers';
+import { transferDiff, type TransferPlayer } from '$lib/transfers';
+import { formatPrice } from '$lib/format';
+import { getBenchOnlyIds, getRecentMinutes, looksBenchOnly } from '$lib/server/benchOnly';
 
 /** What-if tracking begins here; snapshots before this are ignored as "previous". */
 export const TRACKING_START_GW = 5;
@@ -66,7 +68,7 @@ export function parseStrategyKey(s: string): { objective: string; mode: string |
 }
 
 type Row = { player: typeof players.$inferSelect; teamName: string | null; teamLogo: string | null };
-function toTPlayer(r: Row, upcoming: UpcomingFixture[], currentGw: number): TPlayer {
+function toTPlayer(r: Row, upcoming: UpcomingFixture[], currentGw: number, benchOnly = false): TPlayer {
 	return {
 		id: r.player.id,
 		name: r.player.name,
@@ -82,7 +84,8 @@ function toTPlayer(r: Row, upcoming: UpcomingFixture[], currentGw: number): TPla
 		matchdayEase: matchdayEase(upcoming, r.player.position, currentGw),
 		fixtureEase3: fixtureEase(upcoming, r.player.position, 3),
 		fixtureEase5: fixtureEase(upcoming, r.player.position, 5),
-		upcomingFixtures: upcoming
+		upcomingFixtures: upcoming,
+		benchOnly
 	};
 }
 
@@ -219,11 +222,17 @@ export async function toggleMustPick(
 
 /** Build base + wishlist TPlayers for the transfer engine (shared by page + recorder). */
 export async function buildTransferInputs(currentGw: number, baseIds: number[]) {
-	const [baseRows, wlRows] = await Promise.all([fetchRows(baseIds), wishlistRows(currentGw)]);
+	const [baseRows, wlRows, benchOnlyIds] = await Promise.all([
+		fetchRows(baseIds),
+		wishlistRows(currentGw),
+		getBenchOnlyIds()
+	]);
 	const teamIds = [...baseRows, ...wlRows].map((r) => r.player.teamId);
 	const upcoming = await getUpcomingFixturesByTeamIds(teamIds, currentGw, 5);
-	const base = baseRows.map((r) => toTPlayer(r, upcoming.get(r.player.teamId) ?? [], currentGw));
-	const wishlist = wlRows.map((r) => toTPlayer(r, upcoming.get(r.player.teamId) ?? [], currentGw));
+	const tp = (r: Row) =>
+		toTPlayer(r, upcoming.get(r.player.teamId) ?? [], currentGw, benchOnlyIds.has(r.player.id));
+	const base = baseRows.map(tp);
+	const wishlist = wlRows.map(tp);
 	// keep base ordered like baseIds
 	const byId = new Map(base.map((p) => [p.id, p]));
 	const baseOrdered = baseIds.map((id) => byId.get(id)).filter(Boolean) as TPlayer[];
@@ -471,11 +480,14 @@ export type PendingPick = {
 	xi: PendingCardPlayer[];
 	bench: PendingCardPlayer[];
 	/** Transfers vs. the team the matchday started from (see `baseFromGw`). */
-	out: ConstraintPlayer[];
-	in: ConstraintPlayer[];
+	out: TransferPlayer[];
+	in: TransferPlayer[];
 	/** XI metrics from current player data — open matchday only (past ones would be anachronistic). */
 	metrics: PickMetrics | null;
+	/** Constraints this pick doesn't meet (only those its mode follows). */
+	violations: PickViolation[];
 };
+export type PickViolation = { kind: 'out' | 'in' | 'keep' | 'bench'; text: string; players: string[] };
 export type PickMetrics = {
 	remaining: number;
 	points: number;
@@ -485,13 +497,18 @@ export type PickMetrics = {
 	fixtureEase5: number;
 	form: number;
 };
-export type ConstraintPlayer = { id: number; name: string; position: number };
+/** `points` = season points, `price` in millions (both shown next to the name in the planners). */
+export type ConstraintPlayer = { id: number; name: string; position: number; points: number; price: number };
 export type PendingConstraints = {
 	squad: ConstraintPlayer[]; // base squad (the release picker's list)
 	inbound: ConstraintPlayer[]; // wishlist candidates (the must-in picker's list)
 	forcedOut: number[];
 	preferKeep: number[];
 	forcedIn: number[];
+	/** «ספסל בלבד» (per player, not per matchday) among squad + inbound, with recent minutes. */
+	benchOnly: number[];
+	minutes: Record<number, number[]>;
+	suggestBenchOnly: number[];
 };
 export type MatchdayDetail = {
 	gameweekNumber: number;
@@ -575,7 +592,8 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 			bench: hydrate(p.benchPlayerIds),
 			out: [],
 			in: [],
-			metrics: null
+			metrics: null,
+			violations: []
 		};
 	});
 	list.sort((a, b) => {
@@ -594,8 +612,12 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 	const baseIdSet = new Set(baseIds);
 
 	// Each pick's transfers vs. the base team.
-	const metaById = new Map<number, { name: string; position: number }>(
-		[...base, ...list.flatMap((pk) => [...pk.xi, ...pk.bench])].map((p) => [p.id, p])
+	// Out/in lists show season points + price next to each name.
+	const metaById = new Map<number, { name: string; position: number; detail: string }>(
+		[...base, ...list.flatMap((pk) => [...pk.xi, ...pk.bench])].map((p) => [
+			p.id,
+			{ name: p.name, position: p.position, detail: `${p.points} נק׳ · ${formatPrice(p.price)}` }
+		])
 	);
 	for (const pk of list) {
 		const diff = transferDiff(baseIds, [...pk.xi, ...pk.bench].map((p) => p.id), metaById);
@@ -625,18 +647,65 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 	}
 	const inbound = wishlist.filter((p) => !baseIdSet.has(p.id));
 	const inboundSet = new Set(inbound.map((p) => p.id));
-	const asCP = (p: { id: number; name: string; position: number }) => ({
+	const asCP = (p: { id: number; name: string; position: number; points: number; price: number }) => ({
 		id: p.id,
 		name: p.name,
-		position: p.position
+		position: p.position,
+		points: p.points,
+		price: p.price
 	});
 	const constraints: PendingConstraints = {
 		squad: base.map(asCP).sort((a, b) => a.position - b.position),
 		inbound: inbound.map(asCP).sort((a, b) => a.position - b.position),
 		forcedOut: (liveConstraints?.mustOut ?? finalRow?.mustOutIds ?? []).filter((id) => baseIdSet.has(id)),
 		preferKeep: (liveConstraints?.preferKeep ?? finalRow?.preferKeepIds ?? []).filter((id) => baseIdSet.has(id)),
-		forcedIn: (liveConstraints?.mustIn ?? finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id))
+		forcedIn: (liveConstraints?.mustIn ?? finalRow?.mustInIds ?? []).filter((id) => inboundSet.has(id)),
+		benchOnly: [],
+		minutes: {},
+		suggestBenchOnly: []
 	};
+	const pickerIds = [...constraints.squad, ...constraints.inbound].map((p) => p.id);
+	const [benchOnlyIds, minutes] = await Promise.all([getBenchOnlyIds(), getRecentMinutes(pickerIds, 3)]);
+	constraints.benchOnly = pickerIds.filter((id) => benchOnlyIds.has(id));
+	constraints.minutes = Object.fromEntries(minutes);
+	constraints.suggestBenchOnly = pickerIds.filter(
+		(id) => !benchOnlyIds.has(id) && looksBenchOnly(minutes.get(id))
+	);
+
+	// Which constraints each suggestion misses. Modes: «מוגבל» follows out/keep/in, «יציאה בלבד»
+	// out/keep, «חופשי» none of them; «ספסל בלבד» applies to every mode (open matchday only —
+	// past matchdays were recorded before it existed).
+	const nameOf = new Map<number, string>(
+		[...base, ...wishlist, ...list.flatMap((pk) => [...pk.xi, ...pk.bench])].map((p) => [p.id, p.name])
+	);
+	const names = (ids: number[]) => ids.map((id) => nameOf.get(id) ?? `#${id}`);
+	for (const pk of list) {
+		if (pk.strategy === 'actual') continue;
+		const ids = new Set([...pk.xi, ...pk.bench].map((p) => p.id));
+		const xiIds = new Set(pk.xi.map((p) => p.id));
+		const followsOut = pk.mode === 'constrained' || pk.mode === 'out';
+		const v: PickViolation[] = [];
+		const add = (kind: PickViolation['kind'], text: string, bad: number[]) => {
+			if (bad.length) v.push({ kind, text, players: names(bad) });
+		};
+		if (followsOut) {
+			add('out', 'לא שוחררו למרות «לשחרר»', constraints.forcedOut.filter((id) => ids.has(id)));
+			add(
+				'keep',
+				'שוחררו למרות «עדיף לא להוציא» — אין תוכנית חוקית בלעדיהם',
+				constraints.preferKeep.filter((id) => !ids.has(id))
+			);
+		}
+		if (pk.mode === 'constrained')
+			add('in', 'לא נכנסו למרות «חייבים להיכנס»', constraints.forcedIn.filter((id) => !ids.has(id)));
+		if (live)
+			add(
+				'bench',
+				'פותחים למרות «ספסל בלבד» — אין הרכב חוקי בלעדיהם',
+				constraints.benchOnly.filter((id) => xiIds.has(id))
+			);
+		pk.violations = v;
+	}
 
 	return { gameweekNumber: gw, scored, live, baseFromGw, picks: list, constraints };
 }

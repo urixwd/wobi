@@ -275,6 +275,15 @@ export const matchdayPlan = pgTable(
 	(t) => [uniqueIndex('matchday_plan_gw_uidx').on(t.gameweekNumber)]
 );
 
+/**
+ * Players who never start (e.g. a backup goalkeeper). Per player, not per matchday:
+ * strategies and /options only put them on the bench unless no legal XI avoids it.
+ */
+export const benchOnly = pgTable('bench_only', {
+	playerId: integer('player_id').primaryKey(),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
 export type MySquad = typeof mySquad.$inferSelect;
 export type FinalSquad = typeof finalSquads.$inferSelect;
 export type Sketch = typeof sketches.$inferSelect;

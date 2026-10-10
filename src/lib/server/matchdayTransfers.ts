@@ -31,6 +31,8 @@ export type TPlayer = {
 	fixtureEase3: number; // average ease over the next up-to-3 fixtures
 	fixtureEase5: number; // average ease over the next up-to-5 fixtures
 	upcomingFixtures: UpcomingFixture[];
+	/** «ספסל בלבד»: only starts when no legal XI avoids it. */
+	benchOnly?: boolean;
 };
 
 export type ObjectiveKey = 'points' | 'vlfm' | 'fixtures' | 'fixtures3' | 'fixtures5' | 'form';
@@ -154,9 +156,11 @@ function canCover(sq: TPlayer[]): boolean {
 function arrange(sq15: TPlayer[], score: ScoreFn): { xi: TPlayer[]; bench: TPlayer[] } | null {
 	const byPos: Record<number, TPlayer[]> = { 1: [], 2: [], 3: [], 4: [] };
 	for (const p of sq15) byPos[p.position]?.push(p);
-	for (const pos of [1, 2, 3, 4]) byPos[pos].sort((a, b) => score(b) - score(a) || b.points - a.points);
+	// Bench-only players sort last, so a shape only starts them when it runs out of others.
+	for (const pos of [1, 2, 3, 4])
+		byPos[pos].sort((a, b) => Number(!!a.benchOnly) - Number(!!b.benchOnly) || score(b) - score(a) || b.points - a.points);
 
-	let best: { xi: TPlayer[]; bench: TPlayer[]; sc: number } | null = null;
+	let best: { xi: TPlayer[]; bench: TPlayer[]; sc: number; starters: number } | null = null;
 	for (const s of XI_SHAPES) {
 		if (byPos[1].length < 2 || byPos[2].length < s.def + 1 || byPos[3].length < s.mid + 1 || byPos[4].length < s.fwd + 1)
 			continue;
@@ -175,7 +179,9 @@ function arrange(sq15: TPlayer[], score: ScoreFn): { xi: TPlayer[]; bench: TPlay
 		}
 		if (!ok || xi.length !== 11 || bench.length !== 4) continue;
 		const sc = xi.reduce((a, p) => a + score(p), 0);
-		if (!best || sc > best.sc) best = { xi, bench, sc };
+		const starters = xi.filter((p) => p.benchOnly).length; // fewer bench-only starters wins first
+		if (!best || starters < best.starters || (starters === best.starters && sc > best.sc))
+			best = { xi, bench, sc, starters };
 	}
 	return best ? { xi: best.xi, bench: best.bench } : null;
 }

@@ -7,6 +7,7 @@ import {
 	resolveCurrentGwNumber
 } from '$lib/server/upcomingFixtures';
 import { generateSquadOptions, toOptionPlayer, type SquadOption } from '$lib/server/squadOptions';
+import { getBenchOnlyIds } from '$lib/server/benchOnly';
 import { transferDiff, type TransferPlayer } from '$lib/transfers';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -34,6 +35,7 @@ export const load: PageServerLoad = async () => {
 		5
 	);
 
+	const benchOnlyIds = await getBenchOnlyIds();
 	const pool = rows.map((r) =>
 		toOptionPlayer({
 			id: r.player.id,
@@ -45,7 +47,8 @@ export const load: PageServerLoad = async () => {
 			logo: r.teamLogo ?? r.player.teamLogoPath,
 			upcomingFixtures: upcoming.get(r.player.teamId) ?? [],
 			lastRoundPlayerStats: r.player.lastRoundPlayerStats,
-			lastSeasonPlayerStats: r.player.lastSeasonPlayerStats
+			lastSeasonPlayerStats: r.player.lastSeasonPlayerStats,
+			benchOnly: benchOnlyIds.has(r.player.id)
 		})
 	);
 

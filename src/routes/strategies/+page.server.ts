@@ -10,6 +10,7 @@ import {
 	type PlanKind
 } from '$lib/server/strategyTracking';
 import { resolveCurrentGwNumber } from '$lib/server/upcomingFixtures';
+import { toggleBenchOnly } from '$lib/server/benchOnly';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -51,6 +52,13 @@ export const actions: Actions = {
 	toggleMustIn: ({ request }) => toggle('in', request),
 	toggleMustOut: ({ request }) => toggle('out', request),
 	togglePreferKeep: ({ request }) => toggle('keep', request),
+	/** «ספסל בלבד» is per player (not per matchday). */
+	toggleBenchOnly: async ({ request }) => {
+		const playerId = Number((await request.formData()).get('playerId'));
+		if (!playerId) return fail(400, { message: 'חסר שחקן' });
+		await toggleBenchOnly(playerId);
+		return { success: true };
+	},
 	/** Save a strategy's lineup as a sketch (same as /watchlist, /squad). */
 	saveSketch: async ({ request }) => {
 		const form = await request.formData();
