@@ -2,41 +2,17 @@ import { fail, redirect } from '@sveltejs/kit';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { mySquad, players, sketches, teams } from '$lib/server/db/schema';
-import { resolveCurrentGwNumber, MAX_GW } from '$lib/server/upcomingFixtures';
+import {
+	getUpcomingFixturesByTeamIds,
+	resolveCurrentGwNumber,
+	MAX_GW
+} from '$lib/server/upcomingFixtures';
+import { formatPrice } from '$lib/format';
+import { positionLabel } from '$lib/positions';
 import { isExactSquad } from '$lib/squadDraft';
+import { seasonPoints } from '$lib/stats';
+import { transferDiff } from '$lib/transfers';
 import type { Actions, PageServerLoad } from './$types';
-
-type PlayerRef = {
-	player: typeof players.$inferSelect;
-	teamName: string | null;
-	teamLogo: string | null;
-};
-
-function transferDiff(
-	savedIds: number[],
-	sketchIds: number[],
-	byId: Record<number, PlayerRef>
-) {
-	const saved = new Set(savedIds);
-	const next = new Set(sketchIds);
-	const out = savedIds
-		.filter((id) => !next.has(id))
-		.map((id) => byId[id])
-		.filter(Boolean);
-	const inn = sketchIds
-		.filter((id) => !saved.has(id))
-		.map((id) => byId[id])
-		.filter(Boolean);
-	out.sort(
-		(a, b) =>
-			a.player.position - b.player.position || a.player.name.localeCompare(b.player.name, 'he')
-	);
-	inn.sort(
-		(a, b) =>
-			a.player.position - b.player.position || a.player.name.localeCompare(b.player.name, 'he')
-	);
-	return { out, in: inn };
-}
 
 export const load: PageServerLoad = async ({ url }) => {
 	const current = await resolveCurrentGwNumber(4);
@@ -67,10 +43,39 @@ export const load: PageServerLoad = async ({ url }) => {
 					.leftJoin(teams, eq(players.teamId, teams.id))
 					.where(inArray(players.id, ids))
 			: [];
-	const byId = Object.fromEntries(playerRows.map((r) => [r.player.id, r])) as Record<
-		number,
-		PlayerRef
-	>;
+	// Fixtures coloured with this sketch's matchday ratings (and each player's position).
+	const upcoming = await getUpcomingFixturesByTeamIds(
+		playerRows.map((r) => r.player.teamId),
+		gw,
+		5,
+		gw
+	);
+	const cardById = new Map(
+		playerRows.map((r) => [
+			r.player.id,
+			{
+				id: r.player.id,
+				name: r.player.name,
+				price: r.player.price,
+				points: seasonPoints(r.player) ?? 0,
+				position: r.player.position,
+				logo: r.teamLogo ?? r.player.teamLogoPath,
+				teamName: r.teamName,
+				upcomingFixtures: upcoming.get(r.player.teamId) ?? []
+			}
+		])
+	);
+	const metaById = new Map(
+		playerRows.map((r) => [
+			r.player.id,
+			{
+				name: r.player.name,
+				position: r.player.position,
+				detail: `${positionLabel(r.player.position)} · ${formatPrice(r.player.price)}`
+			}
+		])
+	);
+	const cards = (ids: number[]) => ids.map((id) => cardById.get(id)).filter((p) => p != null);
 
 	return {
 		gw,
@@ -81,7 +86,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			const xiCount = s.xiPlayerIds.length;
 			const benchCount = s.benchPlayerIds.length;
 			const sketchIds = [...s.xiPlayerIds, ...s.benchPlayerIds];
-			const { out, in: inn } = transferDiff(savedIds, sketchIds, byId);
+			const { out, in: inn } = transferDiff(savedIds, sketchIds, metaById);
 			const savedXi = squad?.xiPlayerIds ?? [];
 			const savedBench = squad?.benchPlayerIds ?? [];
 			return {
@@ -91,8 +96,8 @@ export const load: PageServerLoad = async ({ url }) => {
 				total: xiCount + benchCount,
 				isWip: xiCount < 11 || benchCount < 4,
 				matchesSaved: isExactSquad(s.xiPlayerIds, s.benchPlayerIds, savedXi, savedBench),
-				xiPlayers: s.xiPlayerIds.map((id) => byId[id]).filter(Boolean),
-				benchPlayers: s.benchPlayerIds.map((id) => byId[id]).filter(Boolean),
+				xiPlayers: cards(s.xiPlayerIds),
+				benchPlayers: cards(s.benchPlayerIds),
 				transfers: {
 					out,
 					in: inn

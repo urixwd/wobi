@@ -7,40 +7,13 @@ import {
 	resolveCurrentGwNumber
 } from '$lib/server/upcomingFixtures';
 import { generateSquadOptions, toOptionPlayer, type SquadOption } from '$lib/server/squadOptions';
+import { transferDiff, type TransferPlayer } from '$lib/transfers';
 import type { Actions, PageServerLoad } from './$types';
-
-export type TransferPlayer = { id: number; name: string; position: number };
 
 export type SquadOptionWithTransfers = SquadOption & {
 	out: TransferPlayer[];
 	in: TransferPlayer[];
 };
-
-function transferDiff(
-	savedIds: number[],
-	optionIds: number[],
-	nameById: Map<number, { name: string; position: number }>
-): { out: TransferPlayer[]; in: TransferPlayer[] } {
-	const saved = new Set(savedIds);
-	const next = new Set(optionIds);
-	const out: TransferPlayer[] = [];
-	const inn: TransferPlayer[] = [];
-	for (const id of savedIds) {
-		if (!next.has(id)) {
-			const meta = nameById.get(id);
-			out.push({ id, name: meta?.name ?? `#${id}`, position: meta?.position ?? 0 });
-		}
-	}
-	for (const id of optionIds) {
-		if (!saved.has(id)) {
-			const meta = nameById.get(id);
-			inn.push({ id, name: meta?.name ?? `#${id}`, position: meta?.position ?? 0 });
-		}
-	}
-	out.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, 'he'));
-	inn.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, 'he'));
-	return { out, in: inn };
-}
 
 export const load: PageServerLoad = async () => {
 	const rows = await db
