@@ -32,7 +32,7 @@
 		{
 			key: 'volatility',
 			label: 'תנודתיות',
-			hint: 'טווח צפוי (סטיית תקן) של סך נקודות ה־XI במחזור: פיזור הנקודות של כל שחקן + צמדים מאותה קבוצה שזזים יחד. גבוה = יותר סיכוי ויותר סיכון; לא טוב או רע כשלעצמו',
+			hint: 'טווח צפוי (סטיית תקן) של סך נקודות ה־XI במחזור: פיזור הנקודות של כל שחקן, צמדים מאותה קבוצה שזזים יחד (מעלה), והגנה מול התקפה יריבה באותו משחק שמתקזזות (מוריד). גבוה = יותר סיכוי ויותר סיכון; לא טוב או רע כשלעצמו',
 			get: (i) => i.volatility,
 			show: (i) => `±${i.volatility}`,
 			better: 'none'
@@ -310,7 +310,9 @@
 					bench={s.benchPlayers}
 					out={s.transfers.out}
 					inn={s.transfers.in}
-					diffLabel="חילופים מול הקבוצה השמורה"
+					diffLabel={data.transferBaseGw != null
+						? `חילופים מול הקבוצה של מחזור ${data.transferBaseGw}`
+						: 'חילופים מול הקבוצה השמורה'}
 					actions
 					sketchButton={false}
 				>
@@ -345,6 +347,15 @@
 											>({lp.kind === 'attack' ? 'התקפה' : lp.kind === 'defence' ? 'שער נקי' : 'חלש'})</span
 										>{k < i.linkedPairs.length - 1 ? ' · ' : ''}
 									{/each}
+								</li>
+							{/if}
+							{#if i.hedgePairs.length}
+								<li
+									class="text-slate-300"
+									title="שוער/מגן שלך מול חלוץ/קשר שלך מהקבוצה היריבה באותו משחק: כשהתוקף כובש, ההגנה מאבדת שער נקי — הנקודות מתקזזות"
+								>
+									⚖️ מתקזזים:
+									<span class="text-slate-200">{i.hedgePairs.map((h) => h.players.join(' מול ')).join(' · ')}</span>
 								</li>
 							{/if}
 							{#each i.risks as r (r.kind)}

@@ -60,6 +60,8 @@ export type LineupInsights = {
 	volatility: number;
 	/** XI players from the same club (they share a match, so their points move together). */
 	linkedPairs: { team: string; players: string[]; kind: 'attack' | 'defence' | 'mixed' }[];
+	/** XI GK/DEF facing an XI attacker this matchday — their points tend to cancel out. */
+	hedgePairs: { players: [string, string] }[];
 };
 
 /** Everything `lineupInsights` needs for these player ids (one round of queries). */
@@ -111,10 +113,16 @@ export async function loadInsightContext(
 //     per-position spread (few rounds = noisy): σ² = (n·s² + K·prior²) / (n + K).
 // ρᵢⱼ: same club (same match) — two attackers (MID/FWD) share goals/assists, two of
 //     GK/DEF share the clean sheet → strongly linked; one of each → weakly linked.
+//     Opposite sides of the same match → see RHO_HEDGE / RHO_OPPOSED_SAME_UNIT.
 const PRIOR_SD: Record<number, number> = { 1: 2.5, 2: 3, 3: 3, 4: 3.5 };
 const PRIOR_WEIGHT = 2;
 const RHO_SAME_UNIT = 0.5;
 const RHO_MIXED = 0.15;
+// Opposite sides of the same match: my GK/DEF vs my attacker on the other team → when the
+// attacker scores the defender loses his clean sheet (a hedge); attacker vs attacker or
+// defence vs defence → an open / tight game helps both a little.
+const RHO_HEDGE = -0.3;
+const RHO_OPPOSED_SAME_UNIT = 0.1;
 const isDef = (pos: number) => pos === 1 || pos === 2;
 
 function playerSd(points: number[], position: number): number {
@@ -203,11 +211,23 @@ export function lineupInsights(xiIds: number[], benchIds: number[], ctx: Insight
 	const sd = xi.map((r) => playerSd(ctx.roundPoints.get(r.player.id) ?? [], r.player.position));
 	let variance = sd.reduce((a, x) => a + x * x, 0);
 	const linkedPairs: LineupInsights['linkedPairs'] = [];
+	const hedgePairs: LineupInsights['hedgePairs'] = [];
 	for (let i = 0; i < xi.length; i++)
 		for (let j = i + 1; j < xi.length; j++) {
 			const a = xi[i].player;
 			const b = xi[j].player;
-			if (a.teamId !== b.teamId) continue;
+			if (a.teamId !== b.teamId) {
+				// Same match, opposite sides (this matchday's fixture, matched by team name).
+				const aFx = fx(xi[i]).find((f) => f.gameweekNumber === ctx.gw);
+				if (!aFx || aFx.opponentName !== xi[j].teamName) continue;
+				const hedge = isDef(a.position) !== isDef(b.position);
+				variance += 2 * (hedge ? RHO_HEDGE : RHO_OPPOSED_SAME_UNIT) * sd[i] * sd[j];
+				if (hedge) {
+					const [d, att] = isDef(a.position) ? [a, b] : [b, a];
+					hedgePairs.push({ players: [d.name, att.name] });
+				}
+				continue;
+			}
 			const same = isDef(a.position) === isDef(b.position);
 			variance += 2 * (same ? RHO_SAME_UNIT : RHO_MIXED) * sd[i] * sd[j];
 			linkedPairs.push({
@@ -218,8 +238,9 @@ export function lineupInsights(xiIds: number[], benchIds: number[], ctx: Insight
 		}
 
 	return {
-		volatility: Math.round(Math.sqrt(variance) * 10) / 10,
+		volatility: Math.round(Math.sqrt(Math.max(0, variance)) * 10) / 10,
 		linkedPairs,
+		hedgePairs,
 		valid: issues.length === 0,
 		issues,
 		transfers,

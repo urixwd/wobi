@@ -8,12 +8,12 @@ import {
 	MAX_GW
 } from '$lib/server/upcomingFixtures';
 import { formatPrice } from '$lib/format';
-import { positionLabel } from '$lib/positions';
 import { isExactSquad } from '$lib/squadDraft';
 import { seasonPoints } from '$lib/stats';
 import { transferDiff } from '$lib/transfers';
 import { lineupInsights, loadInsightContext } from '$lib/server/lineupInsights';
 import type { Actions, PageServerLoad } from './$types';
+import { getBaseSquad } from '$lib/server/strategyTracking';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const current = await resolveCurrentGwNumber(4);
@@ -28,9 +28,13 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	const squad = (await db.select().from(mySquad).limit(1))[0];
 	const savedIds = squad ? [...squad.xiPlayerIds, ...squad.benchPlayerIds] : [];
+	// Transfers count against the previous matchday's official team (what Sport5's 3 transfers
+	// are measured from), not the last save — saving the lineup as my team mustn't zero them.
+	const transferBase = await getBaseSquad(gw);
+	const baseIds = transferBase.ids.length ? transferBase.ids : savedIds;
 
 	const ids = [
-		...new Set([...list.flatMap((s) => [...s.xiPlayerIds, ...s.benchPlayerIds]), ...savedIds])
+		...new Set([...list.flatMap((s) => [...s.xiPlayerIds, ...s.benchPlayerIds]), ...savedIds, ...baseIds])
 	];
 	const playerRows =
 		ids.length > 0
@@ -72,16 +76,18 @@ export const load: PageServerLoad = async ({ url }) => {
 			{
 				name: r.player.name,
 				position: r.player.position,
-				detail: `${positionLabel(r.player.position)} · ${formatPrice(r.player.price)}`
+				detail: `${seasonPoints(r.player) ?? 0} נק׳ · ${formatPrice(r.player.price)}`
 			}
 		])
 	);
 	const cards = (ids: number[]) => ids.map((id) => cardById.get(id)).filter((p) => p != null);
 
-	const insightCtx = await loadInsightContext(ids, gw, savedIds, squad?.freeTransfers ?? 3);
+	const insightCtx = await loadInsightContext(ids, gw, baseIds, squad?.freeTransfers ?? 3);
 
 	return {
 		gw,
+		/** Matchday whose official team is the transfer baseline (null = the saved team). */
+		transferBaseGw: transferBase.ids.length ? transferBase.fromGw : null,
 		currentGw: current,
 		minGw: 1,
 		maxGw: MAX_GW,
@@ -89,7 +95,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			const xiCount = s.xiPlayerIds.length;
 			const benchCount = s.benchPlayerIds.length;
 			const sketchIds = [...s.xiPlayerIds, ...s.benchPlayerIds];
-			const { out, in: inn } = transferDiff(savedIds, sketchIds, metaById);
+			const { out, in: inn } = transferDiff(baseIds, sketchIds, metaById);
 			const insights = lineupInsights(s.xiPlayerIds, s.benchPlayerIds, insightCtx);
 			const savedXi = squad?.xiPlayerIds ?? [];
 			const savedBench = squad?.benchPlayerIds ?? [];
