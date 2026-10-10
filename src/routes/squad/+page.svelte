@@ -104,6 +104,9 @@
 	let runDiffFilters = $state<FixtureDifficulty[]>([]);
 
 	const byId = $derived(new Map(data.allPlayers.map((r) => [r.player.id, r])));
+	/** Points per recent matchday for the stats panel; never played any → «לא שיחק» everywhere. */
+	const historyOf = (id: number) =>
+		data.history[id] ?? data.historyMatchdays.map((md) => ({ matchday: md, played: false as const }));
 
 	const transferSummary = $derived.by(() => {
 		const saved = new Set([...savedXi, ...savedBench]);
@@ -632,6 +635,7 @@
 				lines={playerStatLines(sp.player)}
 				roundPoints={lastRoundPoints(sp.player)}
 				seasonPts={seasonPoints(sp.player)}
+				history={historyOf(sp.player.id)}
 			/>
 		</div>
 	{/if}
@@ -785,7 +789,8 @@
 								{/if}
 								<div class="flex flex-wrap items-start justify-center gap-2">
 									{#each rowPlayers as r}
-									<div class="relative" class:z-[90]={openStatsId === r.player.id}>
+									<!-- hover:z lifts the card (it has its own stacking context via backdrop-blur) so its fixture popover sits above later cards -->
+									<div class="relative hover:z-[95]" class:z-[90]={openStatsId === r.player.id}>
 										<button
 											type="button"
 											class="absolute -left-1 -top-1 z-20 flex h-5 w-5 items-center justify-center rounded-md bg-slate-700/90 text-sm font-medium text-slate-200 shadow hover:bg-slate-600 hover:text-white"
@@ -851,6 +856,7 @@
 													lines={playerStatLines(r.player)}
 													roundPoints={lastRoundPoints(r.player)}
 													seasonPts={seasonPoints(r.player)}
+													history={historyOf(r.player.id)}
 												/>
 											</div>
 										{/if}
@@ -882,7 +888,8 @@
 					{#each BENCH_SLOTS as slot}
 						{@const r = benchForPos(slot.pos)}
 						{#if r}
-							<div class="relative" class:z-[90]={openStatsId === r.player.id}>
+							<!-- hover:z lifts the card (it has its own stacking context via backdrop-blur) so its fixture popover sits above later cards -->
+							<div class="relative hover:z-[95]" class:z-[90]={openStatsId === r.player.id}>
 								<button
 									type="button"
 									class="absolute -left-1 -top-1 z-20 flex h-5 w-5 items-center justify-center rounded-md bg-slate-700/90 text-sm font-medium text-slate-200 shadow hover:bg-slate-600 hover:text-white"
@@ -946,6 +953,7 @@
 											lines={playerStatLines(r.player)}
 											roundPoints={lastRoundPoints(r.player)}
 											seasonPts={seasonPoints(r.player)}
+											history={historyOf(r.player.id)}
 										/>
 									</div>
 								{/if}
