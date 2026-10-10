@@ -1,5 +1,7 @@
 <script lang="ts">
 	import CompactPlayerCard from '$lib/components/CompactPlayerCard.svelte';
+	import FlashLabel from '$lib/components/FlashLabel.svelte';
+	import { Flash } from '$lib/flash.svelte';
 	import { enhance } from '$app/forms';
 	import type { Snippet } from 'svelte';
 	import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
@@ -39,6 +41,10 @@
 		badges?: Snippet;
 		/** Extra buttons in the actions row (e.g. «מחק» on /sketches). */
 		extraActions?: Snippet;
+		/** Extra content under the stats (e.g. decision insights on /sketches). */
+		insights?: Snippet;
+		/** Replaces the plain title (e.g. an editable name). */
+		heading?: Snippet;
 	};
 
 	let {
@@ -58,9 +64,12 @@
 		sketchName = 'סקיצה',
 		gameweekNumber = null,
 		badges,
-		extraActions
+		extraActions,
+		insights,
+		heading
 	}: Props = $props();
 
+	const flash = new Flash();
 	const byPos = (pos: number) => xi.filter((p) => p.position === pos);
 	const xiIds = $derived(xi.map((p) => p.id).join(','));
 	const benchIds = $derived(bench.map((p) => p.id).join(','));
@@ -70,7 +79,7 @@
 <article class="flex flex-col gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4 shadow-lg">
 	<div class="flex flex-wrap items-start justify-between gap-2">
 		<div>
-			<h3 class="text-base font-semibold text-emerald-300">{title}</h3>
+			{#if heading}{@render heading()}{:else}<h3 class="text-base font-semibold text-emerald-300">{title}</h3>{/if}
 			{#if subtitle}<p class="text-xs text-slate-400">{subtitle}</p>{/if}
 		</div>
 		<div class="flex flex-wrap gap-1.5">
@@ -101,6 +110,8 @@
 			{/each}
 		</div>
 	{/if}
+
+	{@render insights?.()}
 
 	<div class="space-y-2 rounded-xl bg-gradient-to-b from-emerald-950/40 to-slate-950/60 p-3">
 		{#if !xi.length}<p class="text-center text-xs text-slate-500">הרכב ריק</p>{/if}
@@ -213,7 +224,16 @@
 		<div class="mt-auto flex flex-wrap gap-2 pt-1">
 			{#if actions}
 			{#if sketchButton}
-			<form method="POST" action="?/saveSketch" use:enhance class="flex-1">
+			<form
+					method="POST"
+					action="?/saveSketch"
+					use:enhance={() =>
+						async ({ result, update }) => {
+							await update({ reset: false });
+							if (result.type === 'success') flash.trigger('sketch');
+						}}
+					class="flex-1"
+				>
 				<input type="hidden" name="xi" value={xiIds} />
 				<input type="hidden" name="bench" value={benchIds} />
 				<input type="hidden" name="sketchName" value={sketchName} />
@@ -224,7 +244,7 @@
 					type="submit"
 					class="w-full rounded-xl bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600"
 				>
-					הוסף לסקיצה
+					<FlashLabel label="הוסף לסקיצה" done={flash.is('sketch')} />
 				</button>
 			</form>
 			{/if}

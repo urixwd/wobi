@@ -13,3 +13,18 @@ body {
 		Arial,
 		sans-serif;
 }
+
+/* Blink an outline a few times to point at an element (e.g. the sketch picked in a table). */
+@keyframes ring-blink {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 rgb(52 211 153 / 0);
+	}
+	50% {
+		box-shadow: 0 0 0 3px rgb(52 211 153 / 0.9);
+	}
+}
+.ring-blink {
+	border-radius: 1rem;
+	animation: ring-blink 0.45s ease-in-out 4;
+}

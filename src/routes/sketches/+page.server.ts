@@ -12,6 +12,7 @@ import { positionLabel } from '$lib/positions';
 import { isExactSquad } from '$lib/squadDraft';
 import { seasonPoints } from '$lib/stats';
 import { transferDiff } from '$lib/transfers';
+import { lineupInsights, loadInsightContext } from '$lib/server/lineupInsights';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -77,6 +78,8 @@ export const load: PageServerLoad = async ({ url }) => {
 	);
 	const cards = (ids: number[]) => ids.map((id) => cardById.get(id)).filter((p) => p != null);
 
+	const insightCtx = await loadInsightContext(ids, gw, savedIds, squad?.freeTransfers ?? 3);
+
 	return {
 		gw,
 		currentGw: current,
@@ -87,6 +90,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			const benchCount = s.benchPlayerIds.length;
 			const sketchIds = [...s.xiPlayerIds, ...s.benchPlayerIds];
 			const { out, in: inn } = transferDiff(savedIds, sketchIds, metaById);
+			const insights = lineupInsights(s.xiPlayerIds, s.benchPlayerIds, insightCtx);
 			const savedXi = squad?.xiPlayerIds ?? [];
 			const savedBench = squad?.benchPlayerIds ?? [];
 			return {
@@ -98,6 +102,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				matchesSaved: isExactSquad(s.xiPlayerIds, s.benchPlayerIds, savedXi, savedBench),
 				xiPlayers: cards(s.xiPlayerIds),
 				benchPlayers: cards(s.benchPlayerIds),
+				insights,
 				transfers: {
 					out,
 					in: inn
@@ -108,6 +113,16 @@ export const load: PageServerLoad = async ({ url }) => {
 };
 
 export const actions: Actions = {
+	/** Rename only — keeps updatedAt (the time the lineup itself was saved). */
+	rename: async ({ request }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		const name = String(form.get('name') ?? '').trim();
+		if (!Number.isFinite(id)) return fail(400, { message: 'מזהה לא תקין' });
+		if (!name) return fail(400, { message: 'שם ריק' });
+		await db.update(sketches).set({ name: name.slice(0, 80) }).where(eq(sketches.id, id));
+		return { success: true };
+	},
 	delete: async ({ request }) => {
 		const form = await request.formData();
 		const id = Number(form.get('id'));
