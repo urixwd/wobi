@@ -21,7 +21,7 @@
 	const riskCount = (i: Ins) => i.risks.reduce((n, r) => n + r.players.length, 0) + i.hardThisMatchday.length;
 
 	/** Comparison columns: value, display, and which direction is better (for the «best» highlight). */
-	const COLUMNS: { key: string; label: string; hint?: string; get: (i: Ins) => number; show: (i: Ins) => string; better: 'high' | 'low' }[] = [
+	const COLUMNS: { key: string; label: string; hint?: string; get: (i: Ins) => number; show: (i: Ins) => string; better: 'high' | 'low' | 'none' }[] = [
 		{ key: 'remaining', label: 'פנוי', get: (i) => i.remaining, show: (i) => `${i.remaining}`, better: 'high' },
 		{ key: 'xiPoints', label: 'נק׳ עונה (XI)', get: (i) => i.xiPoints, show: (i) => `${i.xiPoints}`, better: 'high' },
 		{ key: 'xiForm', label: 'מחזור אחרון (XI)', get: (i) => i.xiForm, show: (i) => `${i.xiForm}`, better: 'high' },
@@ -29,6 +29,14 @@
 		{ key: 'easeMatchday', label: 'לוח מחזור', hint: 'ממוצע קלות היריב ל־XI לפי עמדה (ירוק +3, צהוב +1, אדום −2)', get: (i) => i.easeMatchday, show: (i) => fmtEase(i.easeMatchday), better: 'high' },
 		{ key: 'ease3', label: 'לוח 3', get: (i) => i.ease3, show: (i) => fmtEase(i.ease3), better: 'high' },
 		{ key: 'ease5', label: 'לוח 5', get: (i) => i.ease5, show: (i) => fmtEase(i.ease5), better: 'high' },
+		{
+			key: 'volatility',
+			label: 'תנודתיות',
+			hint: 'טווח צפוי (סטיית תקן) של סך נקודות ה־XI במחזור: פיזור הנקודות של כל שחקן + צמדים מאותה קבוצה שזזים יחד. גבוה = יותר סיכוי ויותר סיכון; לא טוב או רע כשלעצמו',
+			get: (i) => i.volatility,
+			show: (i) => `±${i.volatility}`,
+			better: 'none'
+		},
 		{ key: 'risks', label: 'סיכונים', hint: 'פצועים/מורחקים, דקות נמוכות, «ספסל בלבד» בהרכב, ספסל שלא משחק, משחק קשה במחזור', get: riskCount, show: (i) => `${riskCount(i)}`, better: 'low' }
 	];
 	/** Best value per column among the shown sketches (only when there's something to compare). */
@@ -36,11 +44,45 @@
 		const out: Record<string, number> = {};
 		if (data.sketches.length < 2) return out;
 		for (const c of COLUMNS) {
+			if (c.better === 'none') continue; // e.g. volatility: lower isn't always better
 			const vals = data.sketches.map((s) => c.get(s.insights));
 			out[c.key] = c.better === 'high' ? Math.max(...vals) : Math.min(...vals);
 		}
 		return out;
 	});
+	// Sortable comparison table. null = server order (newest first).
+	type SortKey = 'name' | 'valid' | 'in' | (typeof COLUMNS)[number]['key'];
+	let sortKey = $state<SortKey | null>(null);
+	let sortDir = $state<'asc' | 'desc'>('desc');
+	function sortBy(key: SortKey) {
+		if (sortKey === key) {
+			sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+			return;
+		}
+		sortKey = key;
+		// First click puts the «better» end on top (high for points/ease, low for risks…).
+		const col = COLUMNS.find((c) => c.key === key);
+		sortDir = key === 'name' || col?.better === 'low' ? 'asc' : 'desc';
+	}
+	const sortValue = (s: Sketch, key: SortKey): number | string => {
+		if (key === 'name') return s.name;
+		if (key === 'valid') return s.insights.valid ? 1 : 0;
+		if (key === 'in') return s.transfers.in.length;
+		return COLUMNS.find((c) => c.key === key)!.get(s.insights);
+	};
+	const sortedSketches = $derived.by(() => {
+		if (!sortKey) return data.sketches;
+		const k = sortKey;
+		const dir = sortDir === 'asc' ? 1 : -1;
+		return [...data.sketches].sort((a, b) => {
+			const va = sortValue(a, k);
+			const vb = sortValue(b, k);
+			const cmp = typeof va === 'string' ? va.localeCompare(String(vb), 'he') : va - (vb as number);
+			return cmp * dir || +new Date(b.updatedAt) - +new Date(a.updatedAt);
+		});
+	});
+	const mark = (key: SortKey) => (sortKey === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
+
 	const isBest = (key: string, i: Ins) =>
 		best[key] != null && COLUMNS.find((c) => c.key === key)!.get(i) === best[key];
 
@@ -177,16 +219,31 @@
 				<table class="w-full min-w-[56rem] text-right text-xs">
 					<thead class="text-slate-400">
 						<tr>
-							<th class="py-1 pl-2 font-medium">סקיצה</th>
-							<th class="px-1.5 py-1 text-center font-medium">חוקי</th>
-							<th class="px-1.5 py-1 font-medium">נכנסים</th>
+							<th class="py-1 pl-2 font-medium" aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
+								<button type="button" class="hover:text-slate-200" onclick={() => sortBy('name')}>סקיצה{mark('name')}</button>
+							</th>
+							<th class="px-1.5 py-1 text-center font-medium">
+								<button type="button" class="hover:text-slate-200" onclick={() => sortBy('valid')}>חוקי{mark('valid')}</button>
+							</th>
+							<th class="px-1.5 py-1 font-medium">
+								<button type="button" class="hover:text-slate-200" title="מספר הנכנסים" onclick={() => sortBy('in')}
+									>נכנסים{mark('in')}</button
+								>
+							</th>
 							{#each COLUMNS as c (c.key)}
-								<th class="px-1.5 py-1 text-center font-medium" title={c.hint}>{c.label}</th>
+								<th
+									class="px-1.5 py-1 text-center font-medium"
+									aria-sort={sortKey === c.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+								>
+									<button type="button" class="hover:text-slate-200" title={c.hint} onclick={() => sortBy(c.key)}
+										>{c.label}{mark(c.key)}</button
+									>
+								</th>
 							{/each}
 						</tr>
 					</thead>
 					<tbody>
-						{#each data.sketches as s (s.id)}
+						{#each sortedSketches as s (s.id)}
 							<tr class="border-t border-slate-800">
 								<td class="max-w-[16rem] truncate py-1.5 pl-2">
 									{@render nameEditor(s, 'table')}
@@ -245,7 +302,8 @@
 						{ label: 'vlfm ממוצע', value: s.insights.xiVlfm.toFixed(2), tone: 'text-violet-300' },
 						{ label: 'לוח מחזור', value: fmtEase(s.insights.easeMatchday), tone: 'text-emerald-200' },
 						{ label: 'לוח 3', value: fmtEase(s.insights.ease3), tone: 'text-emerald-200' },
-						{ label: 'לוח 5', value: fmtEase(s.insights.ease5), tone: 'text-emerald-200' }
+						{ label: 'לוח 5', value: fmtEase(s.insights.ease5), tone: 'text-emerald-200' },
+						{ label: 'תנודתיות', value: `±${s.insights.volatility} נק׳`, tone: 'text-amber-200' }
 					]}
 					formation={formationLabel(s.xiPlayers)}
 					xi={s.xiPlayers}
@@ -278,6 +336,17 @@
 									· <span class="text-amber-300">קשה: {i.hardThisMatchday.join(', ')}</span>
 								{/if}
 							</li>
+							{#if i.linkedPairs.length}
+								<li class="text-slate-300" title="שחקנים מאותה קבוצה משחקים באותו משחק — הנקודות שלהם עולות ויורדות יחד">
+									🔗 זזים יחד:
+									{#each i.linkedPairs as lp, k (k)}
+										<span class="text-slate-200">{lp.players.join(' + ')}</span>
+										<span class="text-slate-500"
+											>({lp.kind === 'attack' ? 'התקפה' : lp.kind === 'defence' ? 'שער נקי' : 'חלש'})</span
+										>{k < i.linkedPairs.length - 1 ? ' · ' : ''}
+									{/each}
+								</li>
+							{/if}
 							{#each i.risks as r (r.kind)}
 								<li class="text-amber-300">⚠ {r.text}: <span class="text-amber-100">{r.players.join(', ')}</span></li>
 							{/each}

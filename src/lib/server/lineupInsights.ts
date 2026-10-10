@@ -8,6 +8,7 @@ import { db } from '$lib/server/db';
 import { players, teams } from '$lib/server/db/schema';
 import { getUpcomingFixturesByTeamIds, type UpcomingFixture } from '$lib/server/upcomingFixtures';
 import { getBenchOnlyIds, getRecentMinutes } from '$lib/server/benchOnly';
+import { getPointsHistory } from '$lib/server/playerHistory';
 import { difficultyFor, fixtureEase, matchdayEase } from '$lib/difficulty';
 import { BUDGET_TOTAL, MAX_PER_CLUB, XI_POS_MAX } from '$lib/squadRules';
 import { positionLabel } from '$lib/positions';
@@ -27,6 +28,8 @@ export type InsightContext = {
 	upcoming: Map<number, UpcomingFixture[]>;
 	benchOnly: Set<number>;
 	minutes: Map<number, number[]>;
+	/** Points in each recent matchday he played (newest first). */
+	roundPoints: Map<number, number[]>;
 	savedIds: number[];
 	freeTransfers: number;
 };
@@ -53,6 +56,10 @@ export type LineupInsights = {
 	/** XI players with a green (easy) fixture this matchday. */
 	easyThisMatchday: number;
 	risks: InsightRisk[];
+	/** Estimated spread (± points, 1 SD) of the XI's matchday total — see `volatilityOf`. */
+	volatility: number;
+	/** XI players from the same club (they share a match, so their points move together). */
+	linkedPairs: { team: string; players: string[]; kind: 'attack' | 'defence' | 'mixed' }[];
 };
 
 /** Everything `lineupInsights` needs for these player ids (one round of queries). */
@@ -70,7 +77,7 @@ export async function loadInsightContext(
 				.leftJoin(teams, eq(players.teamId, teams.id))
 				.where(inArray(players.id, unique))
 		: [];
-	const [upcoming, benchOnly, minutes] = await Promise.all([
+	const [upcoming, benchOnly, minutes, history] = await Promise.all([
 		getUpcomingFixturesByTeamIds(
 			rows.map((r) => r.player.teamId),
 			gw,
@@ -78,18 +85,47 @@ export async function loadInsightContext(
 			gw
 		),
 		getBenchOnlyIds(),
-		getRecentMinutes(unique, 3)
+		getRecentMinutes(unique, 3),
+		getPointsHistory()
 	]);
+	const roundPoints = new Map<number, number[]>();
+	for (const id of unique) {
+		const played = (history.byPlayer.get(id) ?? []).filter((h) => !('played' in h)) as { points: number }[];
+		roundPoints.set(id, played.map((h) => h.points));
+	}
 	return {
 		gw,
 		byId: new Map(rows.map((r) => [r.player.id, r])),
 		upcoming,
 		benchOnly,
 		minutes,
+		roundPoints,
 		savedIds,
 		freeTransfers
 	};
 }
+
+// --- Volatility -------------------------------------------------------------
+// SD of the XI matchday total: sqrt(Σσᵢ² + 2Σ ρᵢⱼ σᵢ σⱼ).
+// σᵢ: the player's spread over his recent played matchdays, shrunk toward a typical
+//     per-position spread (few rounds = noisy): σ² = (n·s² + K·prior²) / (n + K).
+// ρᵢⱼ: same club (same match) — two attackers (MID/FWD) share goals/assists, two of
+//     GK/DEF share the clean sheet → strongly linked; one of each → weakly linked.
+const PRIOR_SD: Record<number, number> = { 1: 2.5, 2: 3, 3: 3, 4: 3.5 };
+const PRIOR_WEIGHT = 2;
+const RHO_SAME_UNIT = 0.5;
+const RHO_MIXED = 0.15;
+const isDef = (pos: number) => pos === 1 || pos === 2;
+
+function playerSd(points: number[], position: number): number {
+	const prior = PRIOR_SD[position] ?? 3;
+	const n = points.length;
+	if (n < 2) return prior;
+	const mean = points.reduce((a, b) => a + b, 0) / n;
+	const s2 = points.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+	return Math.sqrt((n * s2 + PRIOR_WEIGHT * prior ** 2) / (n + PRIOR_WEIGHT));
+}
+
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const avg = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
@@ -163,7 +199,27 @@ export function lineupInsights(xiIds: number[], benchIds: number[], ctx: Insight
 		})
 	);
 
+	// Volatility (see above)
+	const sd = xi.map((r) => playerSd(ctx.roundPoints.get(r.player.id) ?? [], r.player.position));
+	let variance = sd.reduce((a, x) => a + x * x, 0);
+	const linkedPairs: LineupInsights['linkedPairs'] = [];
+	for (let i = 0; i < xi.length; i++)
+		for (let j = i + 1; j < xi.length; j++) {
+			const a = xi[i].player;
+			const b = xi[j].player;
+			if (a.teamId !== b.teamId) continue;
+			const same = isDef(a.position) === isDef(b.position);
+			variance += 2 * (same ? RHO_SAME_UNIT : RHO_MIXED) * sd[i] * sd[j];
+			linkedPairs.push({
+				team: xi[i].teamName ?? '?',
+				players: [a.name, b.name],
+				kind: same ? (isDef(a.position) ? 'defence' : 'attack') : 'mixed'
+			});
+		}
+
 	return {
+		volatility: Math.round(Math.sqrt(variance) * 10) / 10,
+		linkedPairs,
 		valid: issues.length === 0,
 		issues,
 		transfers,
