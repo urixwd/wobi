@@ -1,74 +1,101 @@
 import { fail } from '@sveltejs/kit';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { players, teams, watchlistPermanent, watchlistRound } from '$lib/server/db/schema';
+import { mySquad, players, teams, watchlistPermanent, watchlistRound } from '$lib/server/db/schema';
 import {
 	attachUpcoming,
 	getUpcomingFixturesByTeamIds,
-	resolveCurrentGwNumber
+	resolveCurrentGwNumber,
+	type UpcomingFixture
 } from '$lib/server/upcomingFixtures';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
 	const currentGw = await resolveCurrentGwNumber(4);
 
-	const permanentRaw = await db
-		.select({
-			row: watchlistPermanent,
-			player: players,
-			teamName: teams.name,
-			teamLogo: teams.logoPath,
-			difficulty: teams.difficulty
-		})
-		.from(watchlistPermanent)
-		.innerJoin(players, eq(watchlistPermanent.playerId, players.id))
-		.leftJoin(teams, eq(players.teamId, teams.id))
-		.orderBy(asc(players.name));
+	// The whole pool (~430 rows) — the watchlist table and the search both read from it,
+	// so search can find anyone and membership badges are computed client-side.
+	// Inactive players (missing_status=2, previous season) are excluded unless watched.
+	const [allRaw, permanentRows, roundRows, squadRows] = await Promise.all([
+		db
+			.select({
+				player: players,
+				teamName: teams.name,
+				teamLogo: teams.logoPath
+			})
+			.from(players)
+			.leftJoin(teams, eq(players.teamId, teams.id))
+			.orderBy(asc(players.name)),
+		db
+			.select({ id: watchlistPermanent.id, playerId: watchlistPermanent.playerId })
+			.from(watchlistPermanent),
+		// Round list for THIS matchday only (rows from older matchdays are ignored).
+		db
+			.select({ id: watchlistRound.id, playerId: watchlistRound.playerId })
+			.from(watchlistRound)
+			.where(eq(watchlistRound.gameweekNumber, currentGw)),
+		db.select().from(mySquad).limit(1)
+	]);
 
-	// Round watchlist for THIS matchday only.
-	const roundRaw = await db
-		.select({
-			row: watchlistRound,
-			player: players,
-			teamName: teams.name,
-			teamLogo: teams.logoPath,
-			difficulty: teams.difficulty
-		})
-		.from(watchlistRound)
-		.innerJoin(players, eq(watchlistRound.playerId, players.id))
-		.leftJoin(teams, eq(players.teamId, teams.id))
-		.where(eq(watchlistRound.gameweekNumber, currentGw))
-		.orderBy(asc(players.name));
+	const watched = new Set([
+		...permanentRows.map((r) => r.playerId),
+		...roundRows.map((r) => r.playerId)
+	]);
+	const poolRaw = allRaw.filter((r) => r.player.missingStatus !== 2 || watched.has(r.player.id));
 
-	const allPlayersRaw = await db
-		.select({
-			player: players,
-			teamName: teams.name,
-			teamLogo: teams.logoPath,
-			difficulty: teams.difficulty
-		})
-		.from(players)
-		.leftJoin(teams, eq(players.teamId, teams.id))
-		.orderBy(asc(players.name))
-		.limit(500);
-
+	// Unwatched players only feed the search dropdown: keep their payload slim (no per-stat
+	// breakdown, no fixtures). They get the full row after being added (load re-runs).
+	const watchedRaw = poolRaw.filter((r) => watched.has(r.player.id));
 	const upcomingByTeam = await getUpcomingFixturesByTeamIds(
-		[
-			...permanentRaw.map((r) => r.player.teamId),
-			...roundRaw.map((r) => r.player.teamId),
-			...allPlayersRaw.map((r) => r.player.teamId)
-		],
+		watchedRaw.map((r) => r.player.teamId),
 		currentGw,
 		5
 	);
+	const withUpcoming = new Map(
+		attachUpcoming(watchedRaw, upcomingByTeam).map((r) => [r.player.id, r])
+	);
+	const pool = poolRaw.map(
+		(r) =>
+			withUpcoming.get(r.player.id) ?? {
+				...r,
+				player: {
+					...r.player,
+					lastRoundPlayerStats: slimStats(r.player.lastRoundPlayerStats),
+					lastSeasonPlayerStats: slimStats(r.player.lastSeasonPlayerStats)
+				},
+				upcomingFixtures: [] as UpcomingFixture[]
+			}
+	);
 
+	const squad = squadRows[0];
 	return {
 		currentGw,
-		permanent: attachUpcoming(permanentRaw, upcomingByTeam),
-		round: attachUpcoming(roundRaw, upcomingByTeam),
-		allPlayers: attachUpcoming(allPlayersRaw, upcomingByTeam)
+		players: pool,
+		permanent: permanentRows,
+		round: roundRows,
+		squad: {
+			xi: squad?.xiPlayerIds ?? [],
+			bench: squad?.benchPlayerIds ?? []
+		}
 	};
 };
+
+/** Keep only the point totals the search needs (drops the per-stat `statsData` breakdown). */
+function slimStats(raw: unknown): unknown {
+	if (!raw || typeof raw !== 'object') return raw ?? null;
+	const { points, totalPoints, seasonPoints } = raw as Record<string, unknown>;
+	return { points, totalPoints, seasonPoints };
+}
+
+/** Remove actions accept either the row `id` or a `playerId`. */
+function readIds(form: FormData) {
+	const id = Number(form.get('id'));
+	const playerId = Number(form.get('playerId'));
+	return {
+		id: Number.isFinite(id) && id > 0 ? id : null,
+		playerId: Number.isFinite(playerId) && playerId > 0 ? playerId : null
+	};
+}
 
 export const actions: Actions = {
 	addPermanent: async ({ request }) => {
@@ -79,10 +106,11 @@ export const actions: Actions = {
 		return { success: true };
 	},
 	removePermanent: async ({ request }) => {
-		const form = await request.formData();
-		const id = Number(form.get('id'));
-		if (!id) return fail(400);
-		await db.delete(watchlistPermanent).where(eq(watchlistPermanent.id, id));
+		const { id, playerId } = readIds(await request.formData());
+		if (id) await db.delete(watchlistPermanent).where(eq(watchlistPermanent.id, id));
+		else if (playerId)
+			await db.delete(watchlistPermanent).where(eq(watchlistPermanent.playerId, playerId));
+		else return fail(400, { message: 'חסר שחקן' });
 		return { success: true };
 	},
 	addRound: async ({ request }) => {
@@ -100,10 +128,15 @@ export const actions: Actions = {
 		return { success: true };
 	},
 	removeRound: async ({ request }) => {
-		const form = await request.formData();
-		const id = Number(form.get('id'));
-		if (!id) return fail(400);
-		await db.delete(watchlistRound).where(eq(watchlistRound.id, id));
+		const { id, playerId } = readIds(await request.formData());
+		if (id) await db.delete(watchlistRound).where(eq(watchlistRound.id, id));
+		else if (playerId) {
+			// Only this matchday's entry — never touch a row that belongs to another round.
+			const currentGw = await resolveCurrentGwNumber(4);
+			await db
+				.delete(watchlistRound)
+				.where(and(eq(watchlistRound.playerId, playerId), eq(watchlistRound.gameweekNumber, currentGw)));
+		} else return fail(400, { message: 'חסר שחקן' });
 		return { success: true };
 	}
 };

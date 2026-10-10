@@ -7,9 +7,9 @@
 	let { children } = $props();
 
 	const under = (r: string) => $page.url.pathname === r || $page.url.pathname.startsWith(`${r}/`);
-	// /squad: edge to edge. /strategies: wide, but with breathing room on the sides.
+	// /squad: edge to edge. /strategies, /watchlist: wide, but with breathing room on the sides.
 	const fullWidth = $derived(under('/squad'));
-	const wide = $derived(under('/strategies'));
+	const wide = $derived(under('/strategies') || under('/watchlist'));
 </script>
 
 <svelte:head>

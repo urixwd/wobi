@@ -15,8 +15,8 @@
 	type Field = 'overall' | 'vsDef' | 'vsAtt';
 	const COLUMNS: { field: Field; label: string; hint: string }[] = [
 		{ field: 'overall', label: 'כללי', hint: 'ברמת קבוצה, בלי עמדה' },
-		{ field: 'vsDef', label: 'לשוער ולהגנה שלי', hint: 'לפי כוח ההתקפה שלה' },
-		{ field: 'vsAtt', label: 'לקישור ולהתקפה שלי', hint: 'לפי כוח ההגנה שלה' }
+		{ field: 'vsDef', label: 'לשוער ולהגנה שנגדה', hint: 'לפי כוח ההתקפה שלה' },
+		{ field: 'vsAtt', label: 'לקישור ולהתקפה שנגדה', hint: 'לפי כוח ההגנה שלה' }
 	];
 
 	const DOT: Record<FixtureDifficulty, string> = {
@@ -74,19 +74,19 @@
 		כל שורה היא <b>קבוצה יריבה</b>. הצבע שתבחר הוא הצבע שיקבל <b>שחקן שלך במשחק נגדה</b> — ירוק = משחק
 		קל בשבילו, אדום = קשה.
 		<span class="block pt-1">
-			<b class="text-slate-200">לשוער ולהגנה שלי</b> — הצבע של השוערים והמגינים שלך כשהם פוגשים את
+			<b class="text-slate-200">לשוער ולהגנה שנגדה</b> — הצבע של השוערים והמגינים שלך כשהם פוגשים את
 			הקבוצה הזו. תלוי בכמה ההתקפה שלה מסוכנת (סיכוי לשער נקי).
 		</span>
 		<span class="block">
-			<b class="text-slate-200">לקישור ולהתקפה שלי</b> — הצבע של הקשרים והחלוצים שלך כשהם פוגשים את
+			<b class="text-slate-200">לקישור ולהתקפה שנגדה</b> — הצבע של הקשרים והחלוצים שלך כשהם פוגשים את
 			הקבוצה הזו. תלוי בכמה ההגנה שלה חזקה (סיכוי לכבוש ולבשל).
 		</span>
 		<span class="block">
 			<b class="text-slate-200">כללי</b> — כשאין שחקן מסוים, למשל ברשימת «משחקי מחזור» ב־/squad.
 		</span>
 		<span class="block pt-1">
-			לדוגמה: התקפה חזקה והגנה חלשה → <span class="text-red-300">אדום</span> לשוער ולהגנה שלי,
-			<span class="text-emerald-300">ירוק</span> לקישור ולהתקפה שלי.
+			לדוגמה: התקפה חזקה והגנה חלשה → <span class="text-red-300">אדום</span> לשוער ולהגנה שנגדה,
+			<span class="text-emerald-300">ירוק</span> לקישור ולהתקפה שנגדה.
 		</span>
 		<span class="block pt-1 text-slate-500">
 			כל המשחקים הקרובים נצבעים לפי הדירוג של המחזור המתוכנן (לא של מחזור המשחק עצמו).
