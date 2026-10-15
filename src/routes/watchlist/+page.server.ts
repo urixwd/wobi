@@ -1,5 +1,5 @@
 import { fail } from '@sveltejs/kit';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { mySquad, players, teams, watchlistPermanent, watchlistRound } from '$lib/server/db/schema';
 import {
@@ -138,5 +138,46 @@ export const actions: Actions = {
 				.where(and(eq(watchlistRound.playerId, playerId), eq(watchlistRound.gameweekNumber, currentGw)));
 		} else return fail(400, { message: 'חסר שחקן' });
 		return { success: true };
+	},
+	/** Bulk add/remove: `playerIds` (comma-separated), `list` = permanent|round, `op` = add|remove. */
+	bulk: async ({ request }) => {
+		const form = await request.formData();
+		const playerIds = [
+			...new Set(
+				String(form.get('playerIds') ?? '')
+					.split(',')
+					.map((s) => Number(s.trim()))
+					.filter((n) => Number.isFinite(n) && n > 0)
+			)
+		];
+		const list = form.get('list');
+		const op = form.get('op');
+		if (!playerIds.length) return fail(400, { message: 'לא נבחרו שחקנים' });
+		if ((list !== 'permanent' && list !== 'round') || (op !== 'add' && op !== 'remove'))
+			return fail(400, { message: 'פעולה לא חוקית' });
+
+		if (list === 'permanent') {
+			if (op === 'add')
+				await db
+					.insert(watchlistPermanent)
+					.values(playerIds.map((playerId) => ({ playerId })))
+					.onConflictDoNothing();
+			else await db.delete(watchlistPermanent).where(inArray(watchlistPermanent.playerId, playerIds));
+		} else {
+			const currentGw = await resolveCurrentGwNumber(4);
+			if (op === 'add')
+				await db
+					.insert(watchlistRound)
+					.values(playerIds.map((playerId) => ({ playerId, gameweekNumber: currentGw })))
+					.onConflictDoUpdate({ target: watchlistRound.playerId, set: { gameweekNumber: currentGw } });
+			// Only this matchday's entries — never touch rows that belong to another round.
+			else
+				await db
+					.delete(watchlistRound)
+					.where(
+						and(inArray(watchlistRound.playerId, playerIds), eq(watchlistRound.gameweekNumber, currentGw))
+					);
+		}
+		return { success: true, count: playerIds.length };
 	}
 };

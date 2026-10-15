@@ -397,7 +397,64 @@
 
 	let expandedId = $state<number | null>(null);
 
-	const COLS = 10;
+	// ---------------------------------------------------------------- bulk selection
+	let selected = $state<number[]>([]);
+	let bulkBusy = $state(false);
+	const visibleIds = $derived(sortedRows.map((r) => r.player.id));
+	// Selection only counts rows still shown (filters / removals drop the rest).
+	const selectedVisible = $derived(selected.filter((id) => visibleIds.includes(id)));
+	const allSelected = $derived(visibleIds.length > 0 && selectedVisible.length === visibleIds.length);
+	const someSelected = $derived(selectedVisible.length > 0 && !allSelected);
+
+	function toggleSelect(id: number) {
+		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+	}
+	function toggleSelectAll() {
+		selected = allSelected ? [] : [...visibleIds];
+	}
+
+	async function bulk(list: WatchList, op: 'add' | 'remove', ids = selectedVisible) {
+		if (!ids.length || bulkBusy) return;
+		// Only the players whose membership actually changes — so undo restores exactly them.
+		const changing = ids.filter((id) => {
+			const m = membership(id);
+			const isIn = list === 'permanent' ? m.permanent : m.round;
+			return op === 'add' ? !isIn : isIn;
+		});
+		const where = LIST_NAME(list);
+		if (!changing.length) {
+			setNotice({ text: `כל השחקנים שנבחרו כבר ${op === 'add' ? 'ב' : 'מחוץ ל'}${where}`, tone: 'warn' });
+			return;
+		}
+		bulkBusy = true;
+		try {
+			const fd = new FormData();
+			fd.set('playerIds', changing.join(','));
+			fd.set('list', list);
+			fd.set('op', op);
+			const res = await fetch('?/bulk', {
+				method: 'POST',
+				body: fd,
+				headers: { 'x-sveltekit-action': 'true', accept: 'application/json' }
+			});
+			const result = deserialize(await res.text());
+			if (result.type !== 'success') throw new Error('bulk');
+			await invalidateAll();
+		} catch {
+			setNotice({ text: 'שגיאה בעדכון הקבוצתי — נסו שוב', tone: 'err' });
+			return;
+		} finally {
+			bulkBusy = false;
+		}
+		const n = changing.length;
+		setNotice({
+			text: op === 'add' ? `✓ ${n} שחקנים נוספו ל${where}` : `${n} שחקנים הוסרו מ${where}`,
+			tone: 'ok',
+			undo: () => bulk(list, op === 'add' ? 'remove' : 'add', changing)
+		});
+	}
+
+	const COLS = 11;
 	const seg = (on: boolean, tone = 'bg-emerald-500/25 text-emerald-200') =>
 		`rounded-lg px-2.5 py-1 text-xs whitespace-nowrap ${on ? tone : 'bg-slate-800 text-slate-300 hover:text-white'}`;
 </script>
@@ -655,12 +712,63 @@
 		<p class="text-xs text-slate-500">
 			{sortedRows.length} מתוך {counts.total} שחקנים במעקב · לחיצה על שם = פירוט נקודות
 		</p>
+		{#if selectedVisible.length}
+			<div
+				class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs lg:sticky lg:top-[59px] lg:z-20"
+			>
+				<span class="font-medium text-slate-200">{selectedVisible.length} נבחרו</span>
+				<button
+					type="button"
+					disabled={bulkBusy}
+					onclick={() => bulk('round', 'add')}
+					class="rounded-lg bg-sky-500/20 px-2.5 py-1 text-sky-200 hover:bg-sky-500/30 disabled:opacity-50"
+					>+ מחזור {data.currentGw}</button
+				>
+				<button
+					type="button"
+					disabled={bulkBusy}
+					onclick={() => bulk('round', 'remove')}
+					class="rounded-lg bg-slate-800 px-2.5 py-1 text-sky-300 hover:bg-slate-700 disabled:opacity-50"
+					>− מחזור {data.currentGw}</button
+				>
+				<button
+					type="button"
+					disabled={bulkBusy}
+					onclick={() => bulk('permanent', 'add')}
+					class="rounded-lg bg-emerald-500/20 px-2.5 py-1 text-emerald-200 hover:bg-emerald-500/30 disabled:opacity-50"
+					>+ קבוע</button
+				>
+				<button
+					type="button"
+					disabled={bulkBusy}
+					onclick={() => bulk('permanent', 'remove')}
+					class="rounded-lg bg-slate-800 px-2.5 py-1 text-emerald-300 hover:bg-slate-700 disabled:opacity-50"
+					>− קבוע</button
+				>
+				<button
+					type="button"
+					onclick={() => (selected = [])}
+					class="ms-auto rounded-lg px-2 py-1 text-slate-400 hover:text-white">נקה בחירה</button
+				>
+			</div>
+		{/if}
 		<!-- No inner vertical scroll: the page scrolls. Phones keep a sideways scroll for the wide table;
 		     on lg+ the header sticks under the sticky nav (59px tall there). -->
 		<div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/40 lg:overflow-visible">
 			<table class="w-full min-w-[60rem] border-collapse text-right text-xs">
 				<thead class="z-10 bg-slate-900 text-slate-300 shadow lg:sticky lg:top-[59px]">
 					<tr>
+						<th class="w-8 p-2">
+							<input
+								type="checkbox"
+								class="h-3.5 w-3.5 cursor-pointer accent-sky-500"
+								title={allSelected ? 'בטל בחירת הכל' : 'בחר את כל המוצגים'}
+								aria-label="בחר הכל"
+								checked={allSelected}
+								indeterminate={someSelected}
+								onchange={toggleSelectAll}
+							/>
+						</th>
 						<th class="p-2 font-medium">
 							<button type="button" class="hover:text-white" onclick={() => toggleSort('name')}
 								>שחקן{sortMark('name')}</button
@@ -736,6 +844,15 @@
 										? 'bg-amber-500/[0.04]'
 										: ''} {expandedId === r.player.id ? 'bg-slate-800/60' : ''}"
 							>
+								<td class="p-2">
+									<input
+										type="checkbox"
+										class="h-3.5 w-3.5 cursor-pointer accent-sky-500"
+										aria-label="בחר {r.player.name}"
+										checked={selected.includes(r.player.id)}
+										onchange={() => toggleSelect(r.player.id)}
+									/>
+								</td>
 								<td class="max-w-[13rem] p-2">
 									<div class="flex items-center gap-1.5">
 										<button
