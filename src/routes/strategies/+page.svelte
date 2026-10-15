@@ -57,6 +57,8 @@
 	let selectedMode = $state('constrained');
 	// Chart shows one mode at a time (+ your actual), to stay legible.
 	const chartSeries = $derived(st.series.filter((s) => s.key === 'actual' || s.mode === selectedMode));
+	/** Cumulative table: same series, highest season total first. */
+	const cumulativeRows = $derived([...chartSeries].sort((a, b) => b.total - a.total));
 
 	/** Card stats + the objective's own score, as /watchlist showed them. */
 	type Metrics = NonNullable<NonNullable<typeof detail>['picks'][number]['metrics']>;
@@ -191,7 +193,7 @@
 	const plotH = H - padT - padB;
 	const gws = $derived(st.gameweeks);
 	const maxY = $derived(
-		Math.max(1, ...chartSeries.flatMap((s) => s.perGw.map((p) => p.cumulative ?? 0)))
+		Math.max(1, ...chartSeries.flatMap((s) => s.perGw.map((p) => p.points ?? 0)))
 	);
 
 	function niceStep(raw: number): number {
@@ -212,17 +214,18 @@
 		gws.length <= 1 ? padL + plotW / 2 : padL + padX + (i / (gws.length - 1)) * (plotW - 2 * padX);
 	const yFor = (v: number) => padT + plotH - (v / maxY) * plotH;
 	// Matchdays without data are skipped, so a later-added strategy's line starts where its data does.
-	const linePoints = (perGw: { cumulative: number | null }[]) =>
+	const linePoints = (perGw: { points: number | null }[]) =>
 		perGw
-			.map((p, i) => (p.cumulative == null ? null : `${xFor(i)},${yFor(p.cumulative)}`))
+			.map((p, i) => (p.points == null ? null : `${xFor(i)},${yFor(p.points)}`))
 			.filter(Boolean)
 			.join(' ');
 
 	// Value labels: per matchday, stack labels that would overlap (sorted by y, min gap apart).
 	const LABEL_H = 15;
 	const LABEL_GAP = 2;
-	// Approximate width of "<label> · <points>" at font-size 10.
-	const labelW = (name: string, v: number) => name.length * 5.4 + String(v).length * 6.5 + 22;
+	// Leftmost matchday names each line ("<label> · <points>"); the rest carry only the points.
+	const labelW = (v: number, name?: string) =>
+		name ? name.length * 5.4 + String(v).length * 6.5 + 22 : String(v).length * 6.5 + 12;
 	// Keep wide labels inside the plot at the first/last matchday.
 	const labelX = (x: number, w: number) => Math.min(Math.max(x, padL + w / 2), W - padR - w / 2);
 	const labelY = $derived.by(() => {
@@ -230,8 +233,8 @@
 		for (const s of chartSeries) out.set(s.key, []);
 		gws.forEach((_, i) => {
 			const col = chartSeries
-				.filter((s) => s.perGw[i]?.cumulative != null)
-				.map((s) => ({ key: s.key, y: yFor(s.perGw[i].cumulative ?? 0) }))
+				.filter((s) => s.perGw[i]?.points != null)
+				.map((s) => ({ key: s.key, y: yFor(s.perGw[i].points ?? 0) }))
 				.sort((a, b) => a.y - b.y);
 			const step = LABEL_H + LABEL_GAP;
 			for (let j = 1; j < col.length; j++) col[j].y = Math.max(col[j].y, col[j - 1].y + step);
@@ -717,10 +720,10 @@
 			{/if}
 		</div>
 
-		<!-- Cumulative chart, one mode at a time -->
+		<!-- Points per matchday, one mode at a time -->
 		<div class="rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
 			<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-				<h2 class="text-sm font-semibold text-slate-300">נקודות מצטברות</h2>
+				<h2 class="text-sm font-semibold text-slate-300">נקודות לפי מחזור</h2>
 				<div class="flex gap-1">
 					{#each MODE_TABS as t}
 						<button
@@ -733,7 +736,7 @@
 					{/each}
 				</div>
 			</div>
-			<svg viewBox="0 0 {W} {H}" class="w-full" role="img" aria-label="גרף נקודות מצטברות">
+			<svg viewBox="0 0 {W} {H}" class="w-full" role="img" aria-label="גרף נקודות לפי מחזור">
 				{#each yTicks as t}
 					<line x1={padL} x2={W - padR} y1={yFor(t)} y2={yFor(t)} stroke="#1e293b" stroke-width="1" />
 					<text x={padL - 6} y={yFor(t) + 3} text-anchor="end" font-size="10" fill="#64748b">{t}</text>
@@ -754,10 +757,11 @@
 				{/each}
 				{#each chartSeries as s (s.key)}
 					{#each s.perGw as p, i}
-						{#if p.cumulative != null}
-						{@const v = Math.round(p.cumulative)}
-						{@const y = labelY.get(s.key)?.[i] ?? yFor(p.cumulative)}
-						{@const w = labelW(s.label, v)}
+						{#if p.points != null}
+						{@const v = Math.round(p.points)}
+						{@const y = labelY.get(s.key)?.[i] ?? yFor(p.points)}
+						{@const named = i === 0}
+						{@const w = labelW(v, named ? s.label : undefined)}
 						{@const x = labelX(xFor(i), w)}
 						<g>
 							<rect
@@ -770,22 +774,70 @@
 								stroke="#0f172a"
 								stroke-width="1.5"
 							/>
-							<text x={x} y={y + 3.5} text-anchor="middle" direction="rtl" font-size="10" fill="#0f172a"
-								>{s.label} · <tspan font-weight="700">{v}</tspan></text
-							>
+							{#if named}
+								<text x={x} y={y + 3.5} text-anchor="middle" direction="rtl" font-size="10" fill="#0f172a"
+									>{s.label} · <tspan font-weight="700">{v}</tspan></text
+								>
+							{:else}
+								<text x={x} y={y + 3.5} text-anchor="middle" font-size="10" font-weight="700" fill="#0f172a"
+									>{v}</text
+								>
+							{/if}
 						</g>
 						{/if}
 					{/each}
 				{/each}
 			</svg>
-			<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-				{#each chartSeries as s (s.key)}
-					<span class="flex items-center gap-1.5 text-xs text-slate-300">
-						<span class="inline-block h-2.5 w-2.5 rounded-full" style="background:{colorOf(s.objective)}"></span>
-						{s.label}{s.modeLabel ? ` · ${s.modeLabel}` : ''}
-					</span>
-				{/each}
+		</div>
+
+		<!-- Cumulative points, same mode as the chart -->
+		<div class="overflow-x-auto rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
+			<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+				<h2 class="text-sm font-semibold text-slate-300">נקודות מצטברות</h2>
+				<div class="flex gap-1">
+					{#each MODE_TABS as t}
+						<button
+							type="button"
+							onclick={() => (selectedMode = t.key)}
+							class="rounded-lg px-2.5 py-1 text-xs {selectedMode === t.key
+								? 'bg-sky-500/20 text-sky-300'
+								: 'bg-slate-800 text-slate-400'}">{t.label}</button
+						>
+					{/each}
+				</div>
 			</div>
+			<table class="w-full min-w-[24rem] text-right text-sm">
+				<thead>
+					<tr class="text-slate-400">
+						<th class="py-1 font-medium">שיטה</th>
+						{#each gws as gw}
+							<th class="px-2 py-1 text-center font-medium">עד מ׳{gw}</th>
+						{/each}
+					</tr>
+				</thead>
+				<tbody>
+					{#each cumulativeRows as s (s.key)}
+						<tr class="border-t border-slate-800">
+							<td class="py-1.5">
+								<span class="flex items-center gap-1.5">
+									<span class="inline-block h-2.5 w-2.5 rounded-full" style="background:{colorOf(s.objective)}"></span>
+									<span class="text-slate-200">{s.label}</span>
+								</span>
+							</td>
+							{#each s.perGw as p, i}
+								<td
+									class="px-2 py-1.5 text-center {p.cumulative == null
+										? 'text-slate-500'
+										: i === s.perGw.length - 1
+											? 'font-semibold text-white'
+											: 'text-slate-300'}"
+									>{p.cumulative == null ? '—' : Math.round(p.cumulative)}</td
+								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 	{/if}
 </section>
