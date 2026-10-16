@@ -51,7 +51,7 @@
 		return out;
 	});
 	// Sortable comparison table. null = server order (newest first).
-	type SortKey = 'name' | 'valid' | 'in' | (typeof COLUMNS)[number]['key'];
+	type SortKey = 'name' | 'valid' | 'out' | 'in' | (typeof COLUMNS)[number]['key'];
 	let sortKey = $state<SortKey | null>(null);
 	let sortDir = $state<'asc' | 'desc'>('desc');
 	function sortBy(key: SortKey) {
@@ -67,6 +67,7 @@
 	const sortValue = (s: Sketch, key: SortKey): number | string => {
 		if (key === 'name') return s.name;
 		if (key === 'valid') return s.insights.valid ? 1 : 0;
+		if (key === 'out') return s.transfers.out.length;
 		if (key === 'in') return s.transfers.in.length;
 		return COLUMNS.find((c) => c.key === key)!.get(s.insights);
 	};
@@ -226,6 +227,11 @@
 								<button type="button" class="hover:text-slate-200" onclick={() => sortBy('valid')}>חוקי{mark('valid')}</button>
 							</th>
 							<th class="px-1.5 py-1 font-medium">
+								<button type="button" class="hover:text-slate-200" title="מספר היוצאים" onclick={() => sortBy('out')}
+									>יוצאים{mark('out')}</button
+								>
+							</th>
+							<th class="px-1.5 py-1 font-medium">
 								<button type="button" class="hover:text-slate-200" title="מספר הנכנסים" onclick={() => sortBy('in')}
 									>נכנסים{mark('in')}</button
 								>
@@ -240,6 +246,7 @@
 									>
 								</th>
 							{/each}
+							<th class="w-6 py-1"><span class="sr-only">מחיקה</span></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -259,6 +266,13 @@
 								<td class="px-1.5 text-center {s.insights.valid ? 'text-emerald-300' : 'text-red-300'}"
 									title={s.insights.issues.join(' · ')}>{s.insights.valid ? '✓' : '✕'}</td
 								>
+								<td class="max-w-[18rem] px-1.5 text-red-200">
+									{#if s.transfers.out.length}
+										{s.transfers.out.map((p) => p.name).join(', ')}
+									{:else}
+										<span class="text-slate-500">—</span>
+									{/if}
+								</td>
 								<td class="max-w-[18rem] px-1.5 text-emerald-200">
 									{#if s.transfers.in.length}
 										{s.transfers.in.map((p) => p.name).join(', ')}
@@ -273,6 +287,17 @@
 											: 'text-slate-300'}">{c.show(s.insights)}</td
 									>
 								{/each}
+								<td class="px-1 text-center">
+									<form method="POST" action="?/delete" use:enhance>
+										<input type="hidden" name="id" value={s.id} />
+										<button
+											type="submit"
+											class="rounded px-1 text-slate-500 hover:bg-red-500/15 hover:text-red-300"
+											title="מחק את «{s.name}»"
+											aria-label="מחק את {s.name}">✕</button
+										>
+									</form>
+								</td>
 							</tr>
 						{/each}
 					</tbody>
