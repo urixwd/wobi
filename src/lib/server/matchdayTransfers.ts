@@ -90,17 +90,7 @@ const XI_SHAPES: { def: number; mid: number; fwd: number }[] = (() => {
 	return out;
 })();
 
-type ScoreFn = (p: TPlayer) => number;
-const SCORE: Record<ObjectiveKey, ScoreFn> = {
-	points: (p) => p.points,
-	vlfm: (p) => p.vlfm,
-	fixtures: (p) => p.matchdayEase,
-	fixtures3: (p) => p.fixtureEase3,
-	fixtures5: (p) => p.fixtureEase5,
-	form: (p) => p.form
-};
-
-/** The XI metric each objective is judged on. */
+/** The XI metric each objective is judged on. The XI itself is always picked by season points. */
 const COMBO_METRIC: Record<ObjectiveKey, (c: TransferCombo) => number> = {
 	points: (c) => c.points,
 	vlfm: (c) => c.vlfm,
@@ -152,8 +142,13 @@ function canCover(sq: TPlayer[]): boolean {
 	return XI_SHAPES.some((s) => c[2] >= s.def + 1 && c[3] >= s.mid + 1 && c[4] >= s.fwd + 1);
 }
 
-/** Best XI + one-per-position bench from a 15-man squad, maximizing `score`. */
-function arrange(sq15: TPlayer[], score: ScoreFn): { xi: TPlayer[]; bench: TPlayer[] } | null {
+/**
+ * Best XI + one-per-position bench from a 15-man squad, by season points. Every
+ * objective uses this lineup: the objective decides the transfers, not who starts
+ * (a 0-point player with an easy fixture must not bench a star).
+ */
+function arrange(sq15: TPlayer[]): { xi: TPlayer[]; bench: TPlayer[] } | null {
+	const score = (p: TPlayer) => p.points;
 	const byPos: Record<number, TPlayer[]> = { 1: [], 2: [], 3: [], 4: [] };
 	for (const p of sq15) byPos[p.position]?.push(p);
 	// Bench-only players sort last, so a shape only starts them when it runs out of others.
@@ -307,17 +302,13 @@ export function buildTransfers(
 				if (spend > BUDGET_TOTAL + 1e-6) continue;
 				if (!canCover(newSquad)) continue;
 
-				// points arrangement → topPoints (dedup by resulting squad)
-				const pArr = arrange(newSquad, SCORE.points);
-				if (pArr) {
-					const combo = makeCombo(newSquad, squadIds, pArr.xi, pArr.bench);
-					if (!pointsCombos.has(combo.id)) pointsCombos.set(combo.id, combo);
-				}
+				// One lineup per squad (by points): feeds topPoints and every objective.
+				const arr = arrange(newSquad);
+				if (!arr) continue;
+				const combo = makeCombo(newSquad, squadIds, arr.xi, arr.bench);
+				if (!pointsCombos.has(combo.id)) pointsCombos.set(combo.id, combo);
 				// best per objective
 				for (const { key } of OBJECTIVES) {
-					const arr = arrange(newSquad, SCORE[key]);
-					if (!arr) continue;
-					const combo = makeCombo(newSquad, squadIds, arr.xi, arr.bench);
 					const sc = COMBO_METRIC[key](combo);
 					const cur = bestByObj.get(key);
 					const better =
