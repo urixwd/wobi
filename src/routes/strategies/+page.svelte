@@ -156,6 +156,8 @@
 	let boardView = $state<'total' | 'gw'>('total');
 	let boardGwPick = $state<number | null>(null);
 	const scoredGws = $derived(st.gameweeks);
+	// Matchdays where I forgot to make substitutions (flagged on final_squads).
+	const noSubs = $derived(new Set(st.noSubstitutesGws ?? []));
 	const boardGw = $derived(
 		boardGwPick != null && scoredGws.includes(boardGwPick) ? boardGwPick : (scoredGws.at(-1) ?? null)
 	);
@@ -285,12 +287,21 @@
 						{:else}
 							<span class="text-sm font-normal text-slate-500">· טרם דורג</span>
 						{/if}
+						{#if detail.noSubstitutes}
+							<span class="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-300">ללא חילופים</span>
+						{/if}
 					</h2>
 					<p class="text-sm text-slate-400">
 						{#if detail.live}
 							מחושב עכשיו מהסגל הנוכחי והאילוצים של המחזור. נרשם כשלוחצים «שמור קבוצה» ב־/squad.
 						{:else}
 							האילוצים וההרכבים שנרשמו לכל שיטה.
+						{/if}
+						{#if detail.noSubstitutes}
+							<span class="text-amber-300/90"
+								>לא בוצעו חילופים במחזור הזה (נשכח) — «הבחירה שלי» היא הקבוצה של המחזור הקודם, בלי
+								שינויים.</span
+							>
 						{/if}
 					</p>
 				</div>
@@ -617,6 +628,13 @@
 							? `סה״כ ${scoredGws.length} ${scoredGws.length === 1 ? 'מחזור' : 'מחזורים'}`
 							: `מחזור ${boardGw}`}</span
 					>
+					{#if boardView === 'gw' && boardGw != null && noSubs.has(boardGw)}
+						<span class="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-normal text-amber-300">ללא חילופים</span>
+					{:else if boardView === 'total' && noSubs.size}
+						<span class="text-xs font-normal text-amber-300/80"
+							>· * ללא חילופים: מ׳{[...noSubs].sort((a, b) => a - b).join(', ')}</span
+						>
+					{/if}
 				</h2>
 				<div class="flex flex-wrap items-center gap-2">
 					<div class="flex gap-1">
@@ -742,7 +760,7 @@
 					<text x={padL - 6} y={yFor(t) + 3} text-anchor="end" font-size="10" fill="#64748b">{t}</text>
 				{/each}
 				{#each gws as gw, i}
-					<text x={xFor(i)} y={H - padB + 16} text-anchor="middle" font-size="10" fill="#64748b">מ׳{gw}</text>
+					<text x={xFor(i)} y={H - padB + 16} text-anchor="middle" font-size="10" fill={noSubs.has(gw) ? '#fcd34d' : '#64748b'}>מ׳{gw}{noSubs.has(gw) ? '*' : ''}</text>
 				{/each}
 				{#each chartSeries as s (s.key)}
 					<polyline
@@ -811,7 +829,10 @@
 					<tr class="text-slate-400">
 						<th class="py-1 font-medium">שיטה</th>
 						{#each gws as gw}
-							<th class="px-2 py-1 text-center font-medium">עד מ׳{gw}</th>
+							<th
+								class="px-2 py-1 text-center font-medium {noSubs.has(gw) ? 'text-amber-300' : ''}"
+								title={noSubs.has(gw) ? 'ללא חילופים' : undefined}>עד מ׳{gw}{noSubs.has(gw) ? '*' : ''}</th
+							>
 						{/each}
 					</tr>
 				</thead>

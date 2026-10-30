@@ -416,10 +416,15 @@ export type Standings = {
 	gameweeks: number[]; // scored gameweeks, ascending
 	series: StandingSeries[]; // 'actual' first, then variants by total desc
 	leader: string | null;
+	/** Matchdays where the user forgot to make substitutions (actual = previous team). */
+	noSubstitutesGws: number[];
 };
 
 export async function getStandings(): Promise<Standings> {
 	const rows = await db.select().from(strategyPicks).orderBy(asc(strategyPicks.gameweekNumber));
+	const noSubstitutesGws = (
+		await db.select({ gw: finalSquads.gameweekNumber }).from(finalSquads).where(eq(finalSquads.noSubstitutes, true))
+	).map((r) => r.gw);
 	const scored = rows.filter((r) => r.points != null);
 	const gameweeks = [...new Set(scored.map((r) => r.gameweekNumber))].sort((a, b) => a - b);
 
@@ -456,7 +461,7 @@ export async function getStandings(): Promise<Standings> {
 		...series.filter((s) => s.key !== 'actual').sort((a, b) => b.total - a.total)
 	];
 
-	return { gameweeks, series: ordered, leader: gameweeks.length ? leader : null };
+	return { gameweeks, series: ordered, leader: gameweeks.length ? leader : null, noSubstitutesGws };
 }
 
 export type PendingCardPlayer = {
@@ -513,6 +518,8 @@ export type PendingConstraints = {
 export type MatchdayDetail = {
 	gameweekNumber: number;
 	scored: boolean;
+	/** The user forgot to make substitutions: «הבחירה שלי» is the previous matchday's team. */
+	noSubstitutes: boolean;
 	/** Not recorded yet: computed now from my_squad + this matchday's planners. */
 	live: boolean;
 	/** Matchday whose official squad is the transfer base (null = live my_squad). */
@@ -707,5 +714,13 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 		pk.violations = v;
 	}
 
-	return { gameweekNumber: gw, scored, live, baseFromGw, picks: list, constraints };
+	return {
+		gameweekNumber: gw,
+		scored,
+		noSubstitutes: !live && (finalRow?.noSubstitutes ?? false),
+		live,
+		baseFromGw,
+		picks: list,
+		constraints
+	};
 }

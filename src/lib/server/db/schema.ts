@@ -224,6 +224,8 @@ export const finalSquads = pgTable(
 		mustInIds: jsonb('must_in_ids').$type<number[]>().notNull().default([]),
 		mustOutIds: jsonb('must_out_ids').$type<number[]>().notNull().default([]),
 		preferKeepIds: jsonb('prefer_keep_ids').$type<number[]>().notNull().default([]),
+		/** The user forgot to make substitutions: the previous matchday's team carried over. */
+		noSubstitutes: boolean('no_substitutes').notNull().default(false),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('final_squads_gw_uidx').on(t.gameweekNumber)]
