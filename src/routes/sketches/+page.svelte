@@ -15,6 +15,15 @@
 	});
 
 	type Sketch = PageData['sketches'][number];
+
+	/** One entry per distinct lineup: newer identical copies fold into the oldest. */
+	const shown = $derived(data.sketches.filter((s) => !s.duplicateOf));
+	const duplicateGroups = $derived(shown.filter((s) => s.duplicates.length > 0));
+	/** Folded copies the user chose to look at anyway. */
+	let expandedDup = $state<Set<number>>(new Set());
+
+	const fmtWhen = (d: Date | string) =>
+		new Date(d).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 	type Ins = Sketch['insights'];
 
 	const fmtEase = (n: number) => (n > 0 ? `+${n.toFixed(2)}` : n.toFixed(2));
@@ -42,10 +51,10 @@
 	/** Best value per column among the shown sketches (only when there's something to compare). */
 	const best = $derived.by(() => {
 		const out: Record<string, number> = {};
-		if (data.sketches.length < 2) return out;
+		if (shown.length < 2) return out;
 		for (const c of COLUMNS) {
 			if (c.better === 'none') continue; // e.g. volatility: lower isn't always better
-			const vals = data.sketches.map((s) => c.get(s.insights));
+			const vals = shown.map((s) => c.get(s.insights));
 			out[c.key] = c.better === 'high' ? Math.max(...vals) : Math.min(...vals);
 		}
 		return out;
@@ -72,10 +81,10 @@
 		return COLUMNS.find((c) => c.key === key)!.get(s.insights);
 	};
 	const sortedSketches = $derived.by(() => {
-		if (!sortKey) return data.sketches;
+		if (!sortKey) return shown;
 		const k = sortKey;
 		const dir = sortDir === 'asc' ? 1 : -1;
-		return [...data.sketches].sort((a, b) => {
+		return [...shown].sort((a, b) => {
 			const va = sortValue(a, k);
 			const vb = sortValue(b, k);
 			const cmp = typeof va === 'string' ? va.localeCompare(String(vb), 'he') : va - (vb as number);
@@ -200,6 +209,7 @@
 				{/if}
 				<button
 					type="button"
+					data-png-skip
 					class="mr-1 text-xs text-slate-500 hover:text-emerald-300"
 					title="שינוי שם"
 					aria-label="שינוי שם"
@@ -211,7 +221,34 @@
 			{/if}
 		{/snippet}
 
-		{#if data.sketches.length > 1}
+		{#each duplicateGroups as s (s.id)}
+			{@const copies = [s, ...s.duplicates]}
+			{@const orderOnly = s.duplicates.some((d) => d.benchOrderDiffers)}
+			<div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+				<p class="text-amber-100">
+					<span class="font-semibold">{copies.length} סקיצות זהות</span>
+					— אותם 11 בהרכב ואותם 4 בספסל{orderOnly ? ' (רק סדר הספסל שונה)' : ''}:
+					{#each copies as c, k (c.id)}
+						<button type="button" class="text-white underline decoration-amber-400/50 hover:text-amber-200" onclick={() => focusSketch(c.id)}
+							>«{c.name}»</button
+						>
+						<span class="text-xs text-amber-200/70">{fmtWhen(c.updatedAt)}{k === 0 ? ' · הישנה' : ''}</span>{k < copies.length - 1 ? ' · ' : ''}
+					{/each}
+				</p>
+				<form method="POST" action="?/deleteMany" use:enhance>
+					<input type="hidden" name="ids" value={s.duplicates.map((d) => d.id).join(',')} />
+					<button
+						type="submit"
+						class="rounded-xl border border-amber-400/50 px-3 py-1.5 text-sm font-medium text-amber-100 hover:bg-amber-500/20"
+						title={orderOnly ? 'סדר הספסל קובע מי נכנס ראשון — השאר את הישנה רק אם הסדר שלה הוא הנכון' : undefined}
+					>
+						השאר את הישנה, מחק {s.duplicates.length === 1 ? 'את הכפולה' : `${s.duplicates.length} כפולות`}
+					</button>
+				</form>
+			</div>
+		{/each}
+
+		{#if shown.length > 1}
 			<!-- Side-by-side comparison; the best value per column is highlighted -->
 			<div class="overflow-x-auto rounded-2xl border border-slate-700/80 bg-slate-900/70 p-3">
 				<h2 class="mb-2 text-sm font-semibold text-slate-300">
@@ -254,6 +291,12 @@
 							<tr class="border-t border-slate-800">
 								<td class="max-w-[16rem] truncate py-1.5 pl-2">
 									{@render nameEditor(s, 'table')}
+									{#if s.duplicates.length}
+										<span
+											class="rounded-full bg-amber-500/20 px-1.5 text-[10px] font-medium text-amber-200"
+											title="זהה ל: {s.duplicates.map((d) => `«${d.name}»`).join(', ')}">×{s.duplicates.length + 1}</span
+										>
+									{/if}
 									<span class="text-[10px] text-slate-500"
 										>· {new Date(s.updatedAt).toLocaleString('he-IL', {
 											day: 'numeric',
@@ -307,6 +350,35 @@
 
 		<div class="grid gap-5 lg:grid-cols-2">
 			{#each data.sketches as s (s.id)}
+				{#if s.duplicateOf && !expandedDup.has(s.id)}
+					<!-- Newer copy of an identical lineup: one line instead of a second, identical card -->
+					<div
+						id="sketch-{s.id}"
+						class="flex scroll-mt-20 flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 px-4 py-3 text-sm {blinkId === s.id ? 'ring-blink' : ''}"
+						onanimationend={() => (blinkId = null)}
+					>
+						<p class="text-slate-400">
+							<span class="text-slate-200">«{s.name}»</span>
+							<span class="text-xs">{fmtWhen(s.updatedAt)}</span>
+							— זהה ל־<button type="button" class="text-emerald-300 hover:underline" onclick={() => focusSketch(s.duplicateOf!.id)}
+								>«{s.duplicateOf.name}»</button
+							>{s.duplicateOf.benchOrderDiffers ? ' (סדר ספסל שונה)' : ''}
+						</p>
+						<div class="flex gap-2">
+							<button
+								type="button"
+								class="rounded-lg border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
+								onclick={() => (expandedDup = new Set([...expandedDup, s.id]))}>הצג</button
+							>
+							<form method="POST" action="?/delete" use:enhance>
+								<input type="hidden" name="id" value={s.id} />
+								<button type="submit" class="rounded-lg border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:bg-red-500/15 hover:text-red-200"
+									>מחק</button
+								>
+							</form>
+						</div>
+					</div>
+				{:else}
 				<div
 					id="sketch-{s.id}"
 					class="scroll-mt-20 {blinkId === s.id ? 'ring-blink' : ''}"
@@ -340,6 +412,7 @@
 						: 'חילופים מול הקבוצה השמורה'}
 					actions
 					sketchButton={false}
+					downloadName={`${s.name} · מחזור ${data.gw}`}
 				>
 					{#snippet heading()}
 						<h3 class="text-base font-semibold text-emerald-300">
@@ -389,6 +462,18 @@
 						</ul>
 					{/snippet}
 					{#snippet badges()}
+						{#if s.duplicateOf}
+							<span class="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-200" title="אותם 11 + 4">
+								= «{s.duplicateOf.name}»
+							</span>
+						{:else if s.duplicates.length}
+							<span
+								class="rounded-full bg-amber-500/20 px-2.5 py-1 text-xs font-medium text-amber-200"
+								title="זהה ל: {s.duplicates.map((d) => `«${d.name}»`).join(', ')}"
+							>
+								×{s.duplicates.length + 1} זהות
+							</span>
+						{/if}
 						{#if s.matchesSaved}
 							<span
 								class="rounded-full bg-sky-500/25 px-2.5 py-1 text-xs font-medium text-sky-200"
@@ -424,6 +509,7 @@
 					{/snippet}
 				</LineupCard>
 				</div>
+				{/if}
 			{/each}
 		</div>
 	{/if}

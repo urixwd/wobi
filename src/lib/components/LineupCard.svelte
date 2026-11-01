@@ -45,6 +45,8 @@
 		insights?: Snippet;
 		/** Replaces the plain title (e.g. an editable name). */
 		heading?: Snippet;
+		/** When set, show «הורד PNG» saving the card as `${downloadName}.png` (buttons left out). */
+		downloadName?: string | null;
 	};
 
 	let {
@@ -66,8 +68,31 @@
 		badges,
 		extraActions,
 		insights,
-		heading
+		heading,
+		downloadName = null
 	}: Props = $props();
+
+	let card = $state<HTMLElement>();
+	let downloading = $state(false);
+	/** Snapshot the card as it looks on screen; anything marked `data-png-skip` is left out. */
+	async function downloadPng() {
+		if (!card || downloading) return;
+		downloading = true;
+		try {
+			const { toPng } = await import('html-to-image');
+			const url = await toPng(card, {
+				pixelRatio: 2,
+				backgroundColor: '#020617', // slate-950, the page behind the translucent card
+				filter: (node) => !(node instanceof HTMLElement && node.dataset.pngSkip != null)
+			});
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${(downloadName ?? title).replace(/[\\/:*?"<>|]+/g, '-')}.png`;
+			a.click();
+		} finally {
+			downloading = false;
+		}
+	}
 
 	const flash = new Flash();
 	const byPos = (pos: number) => xi.filter((p) => p.position === pos);
@@ -76,7 +101,7 @@
 	const posLabel: Record<number, string> = { 1: 'שוער', 2: 'הגנה', 3: 'קישור', 4: 'התקפה' };
 </script>
 
-<article class="flex flex-col gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-3 shadow-lg">
+<article bind:this={card} class="flex flex-col gap-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-3 shadow-lg">
 	<div class="flex flex-wrap items-start justify-between gap-2">
 		<div>
 			{#if heading}{@render heading()}{:else}<h3 class="text-base font-semibold text-emerald-300">{title}</h3>{/if}
@@ -221,8 +246,8 @@
 		</div>
 	{/if}
 
-	{#if actions || extraActions}
-		<div class="mt-auto flex flex-wrap gap-2 pt-1">
+	{#if actions || extraActions || downloadName}
+		<div class="mt-auto flex flex-wrap gap-2 pt-1" data-png-skip>
 			{#if actions}
 			{#if sketchButton}
 			<form
@@ -261,6 +286,17 @@
 			</form>
 			{/if}
 			{@render extraActions?.()}
+			{#if downloadName}
+				<button
+					type="button"
+					class="rounded-xl border border-slate-600 px-3 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+					disabled={downloading}
+					onclick={downloadPng}
+					title="הורד את ההרכב כתמונה"
+				>
+					{downloading ? '…' : 'הורד PNG'}
+				</button>
+			{/if}
 		</div>
 	{/if}
 </article>
