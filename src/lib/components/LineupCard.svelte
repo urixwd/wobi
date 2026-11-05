@@ -1,17 +1,24 @@
 <script lang="ts">
-	import CompactPlayerCard from '$lib/components/CompactPlayerCard.svelte';
+	import PitchPlayerCard from '$lib/components/PitchPlayerCard.svelte';
 	import FlashLabel from '$lib/components/FlashLabel.svelte';
 	import { Flash } from '$lib/flash.svelte';
 	import { enhance } from '$app/forms';
+	import { cardToPng, downloadUrl, safeFileName } from '$lib/lineupPng';
 	import type { Snippet } from 'svelte';
 	import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
 	import type { TransferPlayer } from '$lib/transfers';
+	import type { DecileInfo } from '$lib/playerMetrics';
 
 	type CardPlayer = {
 		id: number;
 		name: string;
 		price: number;
+		/** Season points. */
 		points: number;
+		/** Last round's points (shown in parentheses), when known. */
+		roundPoints?: number | null;
+		/** Season-points decile badge (עליון … תחתון). */
+		decile?: DecileInfo | null;
 		position: number;
 		logo?: string | null;
 		teamName?: string | null;
@@ -47,6 +54,8 @@
 		heading?: Snippet;
 		/** When set, show «הורד PNG» saving the card as `${downloadName}.png` (buttons left out). */
 		downloadName?: string | null;
+		/** Called after «הורד PNG» saved the card. */
+		onDownloaded?: () => void;
 	};
 
 	let {
@@ -69,26 +78,19 @@
 		extraActions,
 		insights,
 		heading,
-		downloadName = null
+		downloadName = null,
+		onDownloaded
 	}: Props = $props();
 
 	let card = $state<HTMLElement>();
 	let downloading = $state(false);
-	/** Snapshot the card as it looks on screen; anything marked `data-png-skip` is left out. */
+	/** Snapshot the card as it looks on screen (see `$lib/lineupPng`). */
 	async function downloadPng() {
 		if (!card || downloading) return;
 		downloading = true;
 		try {
-			const { toPng } = await import('html-to-image');
-			const url = await toPng(card, {
-				pixelRatio: 2,
-				backgroundColor: '#020617', // slate-950, the page behind the translucent card
-				filter: (node) => !(node instanceof HTMLElement && node.dataset.pngSkip != null)
-			});
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `${(downloadName ?? title).replace(/[\\/:*?"<>|]+/g, '-')}.png`;
-			a.click();
+			downloadUrl(await cardToPng(card), `${safeFileName(downloadName ?? title)}.png`);
+			onDownloaded?.();
 		} finally {
 			downloading = false;
 		}
@@ -145,10 +147,13 @@
 			{#if byPos(pos).length}
 				<div class="flex flex-wrap justify-center gap-1">
 					{#each byPos(pos) as p (p.id)}
-						<CompactPlayerCard
+						<PitchPlayerCard
+							compact
 							name={p.name}
 							price={p.price}
-							points={p.points}
+							seasonPts={p.points}
+							roundPts={p.roundPoints ?? null}
+							decile={p.decile ?? null}
 							logo={p.logo}
 							teamName={p.teamName}
 							upcomingFixtures={p.upcomingFixtures}
@@ -163,15 +168,19 @@
 	{#if bench.length}
 		<div>
 			<div class="mb-1 text-xs text-slate-500">ספסל</div>
-			<div class="flex flex-wrap gap-2">
+			<div class="flex flex-wrap justify-center gap-1">
 				{#each bench as p (p.id)}
-					<CompactPlayerCard
+					<PitchPlayerCard
 						variant="bench"
+						compact
 						name={p.name}
 						price={p.price}
-						points={p.points}
+						seasonPts={p.points}
+						roundPts={p.roundPoints ?? null}
+						decile={p.decile ?? null}
 						logo={p.logo}
 						teamName={p.teamName}
+						upcomingFixtures={p.upcomingFixtures}
 						position={p.position}
 						positionLabel={posLabel[p.position]}
 					/>

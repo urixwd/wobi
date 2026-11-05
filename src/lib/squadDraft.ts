@@ -43,3 +43,9 @@ export function readSquadDraft(): SquadDraft | null {
 		return null;
 	}
 }
+
+/** Content key of a lineup: same XI + same bench (bench order ignored) → same key. */
+export function lineupKey(xi: number[], bench: number[]): string {
+	const sorted = (a: number[]) => [...a].sort((x, y) => x - y).join(',');
+	return `${sorted(xi)}|${sorted(bench)}`;
+}

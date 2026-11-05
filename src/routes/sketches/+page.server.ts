@@ -1,7 +1,9 @@
+import { getPointsDeciles } from '$lib/server/pointsDeciles';
 import { fail, redirect } from '@sveltejs/kit';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { downloadedLineups, mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { lineupKey } from '$lib/squadDraft';
 import {
 	getUpcomingFixturesByTeamIds,
 	resolveCurrentGwNumber,
@@ -9,7 +11,7 @@ import {
 } from '$lib/server/upcomingFixtures';
 import { formatPrice } from '$lib/format';
 import { isExactSquad } from '$lib/squadDraft';
-import { seasonPoints } from '$lib/stats';
+import { lastRoundPoints, seasonPoints } from '$lib/stats';
 import { transferDiff } from '$lib/transfers';
 import { lineupInsights, loadInsightContext } from '$lib/server/lineupInsights';
 import type { Actions, PageServerLoad } from './$types';
@@ -55,6 +57,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		5,
 		gw
 	);
+	const deciles = await getPointsDeciles(playerRows.map((r) => r.player.id));
 	const cardById = new Map(
 		playerRows.map((r) => [
 			r.player.id,
@@ -63,6 +66,8 @@ export const load: PageServerLoad = async ({ url }) => {
 				name: r.player.name,
 				price: r.player.price,
 				points: seasonPoints(r.player) ?? 0,
+				roundPoints: lastRoundPoints(r.player),
+				decile: deciles.get(r.player.id) ?? null,
 				position: r.player.position,
 				logo: r.teamLogo ?? r.player.teamLogoPath,
 				teamName: r.teamName,
@@ -86,13 +91,20 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	// Same XI + same bench (bench order ignored) = the same lineup saved twice. The list is newest
 	// first, so the last sketch seen per lineup (the oldest) is the one to keep.
-	const sortedIds = (a: number[]) => [...a].sort((x, y) => x - y).join(',');
-	const lineupKey = (s: (typeof list)[number]) => `${sortedIds(s.xiPlayerIds)}|${sortedIds(s.benchPlayerIds)}`;
 	const byLineup = new Map<string, (typeof list)[number][]>();
 	for (const s of list) {
-		const key = lineupKey(s);
+		const key = lineupKey(s.xiPlayerIds, s.benchPlayerIds);
 		byLineup.set(key, [...(byLineup.get(key) ?? []), s]);
 	}
+
+	const downloaded = new Set(
+		(
+			await db
+				.select({ key: downloadedLineups.lineupKey })
+				.from(downloadedLineups)
+				.where(eq(downloadedLineups.gameweekNumber, gw))
+		).map((r) => r.key)
+	);
 
 	return {
 		gw,
@@ -115,7 +127,9 @@ export const load: PageServerLoad = async ({ url }) => {
 				benchCount,
 				total: xiCount + benchCount,
 				isWip: xiCount < 11 || benchCount < 4,
-				...duplicateInfo(s, byLineup.get(lineupKey(s))!),
+				...duplicateInfo(s, byLineup.get(lineupKey(s.xiPlayerIds, s.benchPlayerIds))!),
+				lineupKey: lineupKey(s.xiPlayerIds, s.benchPlayerIds),
+				downloaded: downloaded.has(lineupKey(s.xiPlayerIds, s.benchPlayerIds)),
 				matchesSaved: isExactSquad(s.xiPlayerIds, s.benchPlayerIds, savedXi, savedBench),
 				xiPlayers: cards(s.xiPlayerIds),
 				benchPlayers: cards(s.benchPlayerIds),
@@ -148,6 +162,21 @@ function duplicateInfo(s: SketchRow, group: SketchRow[]) {
 }
 
 export const actions: Actions = {
+	/** Remember these lineups (by content, see `lineupKey`) as downloaded for the matchday. */
+	markDownloaded: async ({ request }) => {
+		const form = await request.formData();
+		const gw = Number(form.get('gameweekNumber'));
+		const keys = [...new Set(form.getAll('lineupKey').map(String).filter(Boolean))];
+		if (!Number.isFinite(gw) || !keys.length) return fail(400, { message: 'חסרים נתונים' });
+		await db
+			.insert(downloadedLineups)
+			.values(keys.map((lineupKey) => ({ gameweekNumber: gw, lineupKey })))
+			.onConflictDoUpdate({
+				target: [downloadedLineups.gameweekNumber, downloadedLineups.lineupKey],
+				set: { downloadedAt: sql`now()` }
+			});
+		return { success: true };
+	},
 	/** Rename only — keeps updatedAt (the time the lineup itself was saved). */
 	rename: async ({ request }) => {
 		const form = await request.formData();

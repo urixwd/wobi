@@ -211,6 +211,20 @@ export const sketches = pgTable('sketches', {
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 });
 
+/**
+ * Lineups already saved as PNG on /sketches, by content — `lineupKey` = sorted XI | sorted bench —
+ * so the mark follows the squad, survives deleting the sketch, and returns when it's re-saved.
+ */
+export const downloadedLineups = pgTable(
+	'downloaded_lineups',
+	{
+		id: serial('id').primaryKey(),
+		gameweekNumber: integer('gameweek_number').notNull(),
+		lineupKey: text('lineup_key').notNull(),
+		downloadedAt: timestamp('downloaded_at', { withTimezone: true }).defaultNow().notNull()
+	},
+	(t) => [uniqueIndex('downloaded_lineups_gw_key_uidx').on(t.gameweekNumber, t.lineupKey)]
+);
 
 /** Locked/final squad snapshot per gameweek (after deadline). */
 export const finalSquads = pgTable(

@@ -49,10 +49,13 @@ export function seasonPoints(p: Statsish): number | null {
 
 /** e.g. "21 (5) נק׳" — season total, last round in parentheses */
 export function formatPointsLabel(p: Statsish): string {
-	const season = seasonPoints(p) ?? 0;
-	const round = lastRoundPoints(p);
-	if (round == null) return `${season} נק׳`;
-	return `${season} (${round}) נק׳`;
+	return formatPoints(seasonPoints(p), lastRoundPoints(p));
+}
+
+/** Same as `formatPointsLabel`, from already-extracted numbers. */
+export function formatPoints(season: number | null, round: number | null = null): string {
+	if (round == null) return `${season ?? 0} נק׳`;
+	return `${season ?? 0} (${round}) נק׳`;
 }
 
 export type StatLine = {

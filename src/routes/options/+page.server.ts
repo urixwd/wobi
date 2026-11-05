@@ -1,3 +1,4 @@
+import { getPointsDeciles } from '$lib/server/pointsDeciles';
 import { fail, redirect } from '@sveltejs/kit';
 import { asc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
@@ -76,10 +77,12 @@ export const load: PageServerLoad = async () => {
 	const maxTransfers = Math.min(3, squad?.freeTransfers ?? 3);
 
 	const rawOptions = generateSquadOptions(pool, baseXi, baseBench, maxTransfers);
+	const deciles = await getPointsDeciles(rawOptions.flatMap((o) => [...o.xi, ...o.bench].map((p) => p.id)));
+	const withDecile = <T extends { id: number }>(p: T) => ({ ...p, decile: deciles.get(p.id) ?? null });
 	const options: SquadOptionWithTransfers[] = rawOptions.map((opt) => {
 		const optionIds = [...opt.xi, ...opt.bench].map((p) => p.id);
 		const { out, in: inn } = transferDiff(savedIds, optionIds, nameById);
-		return { ...opt, out, in: inn };
+		return { ...opt, xi: opt.xi.map(withDecile), bench: opt.bench.map(withDecile), out, in: inn };
 	});
 
 	return {

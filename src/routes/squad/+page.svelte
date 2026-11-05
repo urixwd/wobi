@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
+	import PitchPlayerCard from '$lib/components/PitchPlayerCard.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import FlashLabel from '$lib/components/FlashLabel.svelte';
 	import { Flash } from '$lib/flash.svelte';
@@ -810,48 +811,24 @@
 										<button
 											type="button"
 											draggable="true"
-											class="group flex w-[5rem] cursor-grab flex-col items-center overflow-visible rounded-xl border border-white/10 bg-slate-950/75 px-1 py-1.5 text-center shadow-lg backdrop-blur-sm transition hover:border-emerald-400/50 active:cursor-grabbing"
+											class="block cursor-grab rounded-xl active:cursor-grabbing"
 											onclick={() => toggleStats(r.player.id)}
 											ondragstart={(e) => onDragStart(e, r.player.id)}
 											ondragend={onDragEnd}
 											title="לחצו לפירוט · גררו להעברה"
 										>
-											<div class="mb-0.5 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-slate-800">
-												{#if r.teamLogo ?? r.player.teamLogoPath}
-													<img
-														src={r.teamLogo ?? r.player.teamLogoPath}
-														alt=""
-														class="h-6 w-6 object-contain"
-													/>
-												{:else}
-													<span class="text-[10px]">⚽</span>
-												{/if}
-											</div>
-											<span class="line-clamp-2 w-full text-[10px] font-semibold leading-tight text-white"
-												>{r.player.name}</span
-											>
-											<span class="text-[10px] font-semibold tabular-nums text-amber-300"
-												>{formatPrice(r.player.price)}</span
-											>
-											<span class="text-[10px] tabular-nums text-slate-100"
-												>{formatPointsLabel(r.player)}</span
-											>
-											<span class="text-[9px] tabular-nums text-violet-200"
-												>{formatVlfm(vlfm(r.player))} vlfm</span
-											>
-											{#if pointsDeciles.get(r.player.id)}
-												{@const d = pointsDeciles.get(r.player.id)!}
-												<span class="rounded px-1 py-0.5 text-[9px] {d.className}">{d.label}</span>
-											{/if}
-											<div class="mt-1 w-full overflow-visible">
-												<FixtureStrip
-													fixtures={r.upcomingFixtures ?? []}
-													slots={5}
-													position={r.player.position}
-													stacked
-													focusable={false}
-												/>
-											</div>
+											<PitchPlayerCard
+												interactive
+												focusable={false}
+												name={r.player.name}
+												price={r.player.price}
+												seasonPts={seasonPoints(r.player)}
+												roundPts={lastRoundPoints(r.player)}
+												logo={r.teamLogo ?? r.player.teamLogoPath}
+												upcomingFixtures={r.upcomingFixtures ?? []}
+												position={r.player.position}
+												decile={pointsDeciles.get(r.player.id) ?? null}
+											/>
 										</button>
 										{#if openStatsId === r.player.id}
 											<div
@@ -920,35 +897,26 @@
 								<button
 									type="button"
 									draggable="true"
-									class="flex w-[5rem] cursor-grab flex-col items-center rounded-xl border border-slate-700 bg-slate-950/80 px-1 py-1.5 hover:border-emerald-400/50 active:cursor-grabbing"
+									class="block cursor-grab rounded-xl active:cursor-grabbing"
 									onclick={() => toggleStats(r.player.id)}
 									ondragstart={(e) => onDragStart(e, r.player.id)}
 									ondragend={onDragEnd}
 									title="{slot.label} — לחצו לפירוט · גררו להעברה"
 								>
-									<span class="mb-0.5 text-[9px] text-slate-500">{slot.label}</span>
-									{#if r.teamLogo ?? r.player.teamLogoPath}
-										<img
-											src={r.teamLogo ?? r.player.teamLogoPath}
-											alt=""
-											class="mb-0.5 h-6 w-6 object-contain"
-										/>
-									{/if}
-									<span class="line-clamp-2 text-[10px] font-medium">{r.player.name}</span>
-									<span class="text-[10px] font-semibold tabular-nums text-amber-300"
-										>{formatPrice(r.player.price)}</span
-									>
-									<span class="text-[10px] tabular-nums text-slate-200"
-										>{formatPointsLabel(r.player)}</span
-									>
-									<div class="mt-0.5 w-full overflow-visible">
-										<FixtureStrip
-											fixtures={r.upcomingFixtures ?? []}
-											position={r.player.position}
-											stacked
-											focusable={false}
-										/>
-									</div>
+									<PitchPlayerCard
+										variant="bench"
+										interactive
+										focusable={false}
+										positionLabel={slot.label}
+										name={r.player.name}
+										price={r.player.price}
+										seasonPts={seasonPoints(r.player)}
+										roundPts={lastRoundPoints(r.player)}
+										logo={r.teamLogo ?? r.player.teamLogoPath}
+										upcomingFixtures={r.upcomingFixtures ?? []}
+										position={r.player.position}
+										decile={pointsDeciles.get(r.player.id) ?? null}
+									/>
 								</button>
 								{#if openStatsId === r.player.id}
 									<div

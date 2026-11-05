@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import LineupCard from '$lib/components/LineupCard.svelte';
+	import { downloadCardsZip } from '$lib/lineupPng';
 	import { formationLabel } from '$lib/positions';
 	import { isExactSquad, readSquadDraft, type SquadDraft } from '$lib/squadDraft';
 	import type { PageData } from './$types';
@@ -21,6 +23,40 @@
 	const duplicateGroups = $derived(shown.filter((s) => s.duplicates.length > 0));
 	/** Folded copies the user chose to look at anyway. */
 	let expandedDup = $state<Set<number>>(new Set());
+
+	/**
+	 * Lineups already downloaded this matchday, by content (`lineupKey`): server marks plus the ones
+	 * saved in this visit (shown at once, before the reload brings them back from the DB).
+	 */
+	let justDownloaded = $state<Set<string>>(new Set());
+	const isDownloaded = (s: Sketch) => s.downloaded || justDownloaded.has(s.lineupKey);
+	async function markDownloaded(keys: string[]) {
+		if (!keys.length) return;
+		justDownloaded = new Set([...justDownloaded, ...keys]);
+		const body = new FormData();
+		body.set('gameweekNumber', String(data.gw));
+		for (const k of keys) body.append('lineupKey', k);
+		await fetch('?/markDownloaded', { method: 'POST', body, headers: { 'x-sveltekit-action': 'true' } });
+		await invalidateAll();
+	}
+
+	/** «הורד הכל»: every card on screen (folded identical copies skipped) as PNGs in one zip. */
+	let downloadingAll = $state(false);
+	async function downloadAll() {
+		if (downloadingAll) return;
+		downloadingAll = true;
+		try {
+			const cards = data.sketches.flatMap((s) => {
+				const el = document.querySelector<HTMLElement>(`#sketch-${s.id} > article`);
+				return el ? [{ el, name: `${s.name} · מחזור ${data.gw}`, key: s.lineupKey }] : [];
+			});
+			if (!cards.length) return;
+			await downloadCardsZip(cards, `סקיצות · מחזור ${data.gw}`);
+			await markDownloaded(cards.map((c) => c.key));
+		} finally {
+			downloadingAll = false;
+		}
+	}
 
 	const fmtWhen = (d: Date | string) =>
 		new Date(d).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -158,6 +194,17 @@
 				<span class="rounded-lg border border-slate-800 px-3 py-1.5 text-sm text-slate-600">מחזור הבא ←</span>
 			{/if}
 		</nav>
+		{#if data.sketches.length}
+			<button
+				type="button"
+				class="rounded-lg border border-slate-600 px-3 py-1.5 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+				disabled={downloadingAll}
+				onclick={downloadAll}
+				title="הורד את כל ההרכבים במחזור כתמונות PNG (קובץ zip)"
+			>
+				{downloadingAll ? 'מוריד…' : 'הורד הכל'}
+			</button>
+		{/if}
 	</header>
 
 	{#if data.sketches.length === 0}
@@ -291,6 +338,9 @@
 							<tr class="border-t border-slate-800">
 								<td class="max-w-[16rem] truncate py-1.5 pl-2">
 									{@render nameEditor(s, 'table')}
+									{#if isDownloaded(s)}
+										<span class="text-[10px] text-emerald-300" title="כבר הורד כתמונה">✓ הורד</span>
+									{/if}
 									{#if s.duplicates.length}
 										<span
 											class="rounded-full bg-amber-500/20 px-1.5 text-[10px] font-medium text-amber-200"
@@ -360,6 +410,7 @@
 						<p class="text-slate-400">
 							<span class="text-slate-200">«{s.name}»</span>
 							<span class="text-xs">{fmtWhen(s.updatedAt)}</span>
+							{#if isDownloaded(s)}<span class="text-xs text-emerald-300">✓ הורד</span>{/if}
 							— זהה ל־<button type="button" class="text-emerald-300 hover:underline" onclick={() => focusSketch(s.duplicateOf!.id)}
 								>«{s.duplicateOf.name}»</button
 							>{s.duplicateOf.benchOrderDiffers ? ' (סדר ספסל שונה)' : ''}
@@ -413,6 +464,7 @@
 					actions
 					sketchButton={false}
 					downloadName={`${s.name} · מחזור ${data.gw}`}
+					onDownloaded={() => markDownloaded([s.lineupKey])}
 				>
 					{#snippet heading()}
 						<h3 class="text-base font-semibold text-emerald-300">
@@ -472,6 +524,15 @@
 								title="זהה ל: {s.duplicates.map((d) => `«${d.name}»`).join(', ')}"
 							>
 								×{s.duplicates.length + 1} זהות
+							</span>
+						{/if}
+						{#if isDownloaded(s)}
+							<span
+								class="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-200"
+								title="ההרכב הזה כבר הורד כתמונה (לפי השחקנים, גם אם הסקיצה נמחקה ונשמרה מחדש)"
+								data-png-skip
+							>
+								✓ הורד
 							</span>
 						{/if}
 						{#if s.matchesSaved}

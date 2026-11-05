@@ -8,6 +8,8 @@
  * round watchlist. Once a round's results are imported, `scoreRound` fills each
  * pick's XI points, and `getStandings` tallies the season.
  */
+import type { DecileInfo } from '$lib/playerMetrics';
+import { getPointsDeciles } from '$lib/server/pointsDeciles';
 import { asc, desc, eq, inArray, lt } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import {
@@ -469,6 +471,8 @@ export type PendingCardPlayer = {
 	name: string;
 	price: number;
 	points: number;
+	roundPoints: number | null;
+	decile: DecileInfo | null;
 	position: number;
 	logo: string | null;
 	upcomingFixtures: UpcomingFixture[];
@@ -568,6 +572,7 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 		gw,
 		5
 	);
+	const deciles = await getPointsDeciles(ids);
 	const byId = new Map(
 		prows.map((r) => [
 			r.player.id,
@@ -576,6 +581,8 @@ export async function getMatchdayDetail(gw: number): Promise<MatchdayDetail> {
 				name: r.player.name,
 				price: r.player.price,
 				points: seasonPoints(r.player) ?? 0,
+				roundPoints: lastRoundPoints(r.player),
+				decile: deciles.get(r.player.id) ?? null,
 				position: r.player.position,
 				logo: r.logo ?? r.player.teamLogoPath,
 				upcomingFixtures: upcoming.get(r.player.teamId) ?? []

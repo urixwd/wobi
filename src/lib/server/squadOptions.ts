@@ -4,7 +4,7 @@
  * Valid XI: GK1, DEF 3–5, MID 3–5, FWD 1–3 (sum 11). Bench: one per position.
  */
 import { BUDGET_TOTAL, XI_POS_MAX, XI_TOTAL_MAX } from '$lib/squadRules';
-import { seasonPoints } from '$lib/stats';
+import { lastRoundPoints, seasonPoints } from '$lib/stats';
 import { vlfm } from '$lib/playerMetrics';
 import { fixtureEase } from '$lib/difficulty';
 import type { UpcomingFixture } from '$lib/server/upcomingFixtures';
@@ -37,6 +37,8 @@ export type OptionPlayer = {
 	position: number;
 	price: number;
 	points: number;
+	/** Last round's points. */
+	roundPoints: number | null;
 	vlfm: number;
 	fixtureEase: number;
 	logo: string | null;
@@ -84,6 +86,7 @@ export function toOptionPlayer(raw: {
 		position: raw.position,
 		price: raw.price,
 		points: pts,
+		roundPoints: lastRoundPoints(raw),
 		vlfm: v,
 		// Next-3 ease, rated for this player's position (shared scale).
 		fixtureEase: fixtureEase(raw.upcomingFixtures, raw.position, 3),
