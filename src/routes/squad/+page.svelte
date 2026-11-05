@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import FixtureStrip from '$lib/components/FixtureStrip.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import FlashLabel from '$lib/components/FlashLabel.svelte';
@@ -28,10 +29,12 @@
 	let { data, form } = $props();
 
 	/** Working (possibly staged) XI/bench — not written until שמור קבוצה */
-	let xi = $state<number[]>([...(data.staged?.xi ?? data.squad.xiPlayerIds)]);
-	let bench = $state<number[]>([...(data.staged?.bench ?? data.squad.benchPlayerIds)]);
-	let freeTransfers = $state(data.squad.freeTransfers);
-	let viewGw = $state(data.currentGw);
+	let xi = $state<number[]>(untrack(() => [...(data.staged?.xi ?? data.squad.xiPlayerIds)]));
+	let bench = $state<number[]>(
+		untrack(() => [...(data.staged?.bench ?? data.squad.benchPlayerIds)])
+	);
+	let freeTransfers = $state(untrack(() => data.squad.freeTransfers));
+	let viewGw = $state(untrack(() => data.currentGw));
 
 	$effect(() => {
 		writeSquadDraft(xi, bench);
@@ -85,8 +88,8 @@
 		return groups;
 	});
 	/** Last saved in DB — transfer diff baseline */
-	let savedXi = $state<number[]>([...data.squad.xiPlayerIds]);
-	let savedBench = $state<number[]>([...data.squad.benchPlayerIds]);
+	let savedXi = $state<number[]>(untrack(() => [...data.squad.xiPlayerIds]));
+	let savedBench = $state<number[]>(untrack(() => [...data.squad.benchPlayerIds]));
 	let q = $state('');
 	/** Treat geresh/apostrophe variants (`, ׳, ', ’, ‘) as the same so "ג׳יימס" finds "ג`יימס". */
 	function normalizeSearch(s: string): string {
