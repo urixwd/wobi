@@ -286,6 +286,10 @@ export const matchdayPlan = pgTable(
 		mustOutIds: jsonb('must_out_ids').$type<number[]>().notNull().default([]),
 		/** Squad players to keep if any legal plan allows it (soft; strategies avoid releasing them). */
 		preferKeepIds: jsonb('prefer_keep_ids').$type<number[]>().notNull().default([]),
+		/** /sketches: teams every sketch must have at least one player from (XI + bench). */
+		requiredTeamIds: jsonb('required_team_ids').$type<number[]>().notNull().default([]),
+		/** /sketches: teams no transfer may come in from (players already in the base squad may stay). */
+		noInTeamIds: jsonb('no_in_team_ids').$type<number[]>().notNull().default([]),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 	},
 	(t) => [uniqueIndex('matchday_plan_gw_uidx').on(t.gameweekNumber)]

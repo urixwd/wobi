@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import LineupCard from '$lib/components/LineupCard.svelte';
+	import { EASE_SCORE } from '$lib/difficulty';
 	import { downloadCardsZip } from '$lib/lineupPng';
 	import { formationLabel } from '$lib/positions';
 	import { isExactSquad, readSquadDraft, type SquadDraft } from '$lib/squadDraft';
@@ -58,6 +59,9 @@
 		}
 	}
 
+	const hasTeamRules = $derived(data.teamRules.requiredTeamIds.length + data.teamRules.noInTeamIds.length > 0);
+	const meetingRules = $derived(shown.filter((s) => s.teamRuleIssues.length === 0).length);
+
 	const fmtWhen = (d: Date | string) =>
 		new Date(d).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 	type Ins = Sketch['insights'];
@@ -66,14 +70,14 @@
 	const riskCount = (i: Ins) => i.risks.reduce((n, r) => n + r.players.length, 0) + i.hardThisMatchday.length;
 
 	/** Comparison columns: value, display, and which direction is better (for the «best» highlight). */
-	const COLUMNS: { key: string; label: string; hint?: string; get: (i: Ins) => number; show: (i: Ins) => string; better: 'high' | 'low' | 'none' }[] = [
+	const COLUMNS: { key: string; label: string; hint?: string; help?: string; get: (i: Ins) => number; show: (i: Ins) => string; better: 'high' | 'low' | 'none' }[] = [
 		{ key: 'remaining', label: 'פנוי', get: (i) => i.remaining, show: (i) => `${i.remaining}`, better: 'high' },
 		{ key: 'xiPoints', label: 'נק׳ עונה (XI)', get: (i) => i.xiPoints, show: (i) => `${i.xiPoints}`, better: 'high' },
 		{ key: 'xiForm', label: 'מחזור אחרון (XI)', get: (i) => i.xiForm, show: (i) => `${i.xiForm}`, better: 'high' },
 		{ key: 'xiVlfm', label: 'vlfm', get: (i) => i.xiVlfm, show: (i) => i.xiVlfm.toFixed(2), better: 'high' },
-		{ key: 'easeMatchday', label: 'לוח מחזור', hint: 'ממוצע קלות היריב ל־XI לפי עמדה (ירוק +3, צהוב +1, אדום −2)', get: (i) => i.easeMatchday, show: (i) => fmtEase(i.easeMatchday), better: 'high' },
-		{ key: 'ease3', label: 'לוח 3', get: (i) => i.ease3, show: (i) => fmtEase(i.ease3), better: 'high' },
-		{ key: 'ease5', label: 'לוח 5', get: (i) => i.ease5, show: (i) => fmtEase(i.ease5), better: 'high' },
+		{ key: 'easeMatchday', label: 'לוח מחזור', help: 'המשחק של המחזור הזה בלבד (אין משחק במחזור → המשחק הבא).', get: (i) => i.easeMatchday, show: (i) => fmtEase(i.easeMatchday), better: 'high' },
+		{ key: 'ease3', label: 'לוח 3', help: 'לכל שחקן: ממוצע 3 המשחקים הקרובים, החל מהמחזור הזה.', get: (i) => i.ease3, show: (i) => fmtEase(i.ease3), better: 'high' },
+		{ key: 'ease5', label: 'לוח 5', help: 'לכל שחקן: ממוצע 5 המשחקים הקרובים, החל מהמחזור הזה.', get: (i) => i.ease5, show: (i) => fmtEase(i.ease5), better: 'high' },
 		{
 			key: 'volatility',
 			label: 'תנודתיות',
@@ -84,6 +88,26 @@
 		},
 		{ key: 'risks', label: 'סיכונים', hint: 'פצועים/מורחקים, דקות נמוכות, «ספסל בלבד» בהרכב, ספסל שלא משחק, משחק קשה במחזור', get: riskCount, show: (i) => `${riskCount(i)}`, better: 'low' }
 	];
+	/** «?» on a column header: hover shows it, a click pins it (same as /squad). */
+	const HELP_WIDTH = 256; // w-64
+	let helpTip = $state<{ key: string; label: string; text: string; top: number; left: number; pinned: boolean } | null>(null);
+	function showHelp(c: { key: string; label: string; help?: string }, el: HTMLElement, pinned = false) {
+		const rect = el.getBoundingClientRect();
+		helpTip = {
+			key: c.key,
+			label: c.label,
+			text: c.help ?? '',
+			top: rect.bottom + 6,
+			left: Math.max(8, rect.right - HELP_WIDTH),
+			pinned
+		};
+	}
+	function toggleHelp(c: { key: string; label: string; help?: string }, el: HTMLElement) {
+		if (helpTip?.key === c.key && helpTip.pinned) helpTip = null;
+		else showHelp(c, el, true);
+	}
+	const signed = (n: number) => (n > 0 ? `+${n}` : `−${-n}`);
+
 	/** Best value per column among the shown sketches (only when there's something to compare). */
 	const best = $derived.by(() => {
 		const out: Record<string, number> = {};
@@ -96,7 +120,7 @@
 		return out;
 	});
 	// Sortable comparison table. null = server order (newest first).
-	type SortKey = 'name' | 'valid' | 'out' | 'in' | (typeof COLUMNS)[number]['key'];
+	type SortKey = 'name' | 'valid' | 'rules' | 'out' | 'in' | (typeof COLUMNS)[number]['key'];
 	let sortKey = $state<SortKey | null>(null);
 	let sortDir = $state<'asc' | 'desc'>('desc');
 	function sortBy(key: SortKey) {
@@ -107,11 +131,12 @@
 		sortKey = key;
 		// First click puts the «better» end on top (high for points/ease, low for risks…).
 		const col = COLUMNS.find((c) => c.key === key);
-		sortDir = key === 'name' || col?.better === 'low' ? 'asc' : 'desc';
+		sortDir = key === 'name' || key === 'rules' || col?.better === 'low' ? 'asc' : 'desc';
 	}
 	const sortValue = (s: Sketch, key: SortKey): number | string => {
 		if (key === 'name') return s.name;
 		if (key === 'valid') return s.insights.valid ? 1 : 0;
+		if (key === 'rules') return s.teamRuleIssues.length;
 		if (key === 'out') return s.transfers.out.length;
 		if (key === 'in') return s.transfers.in.length;
 		return COLUMNS.find((c) => c.key === key)!.get(s.insights);
@@ -159,6 +184,19 @@
 </svelte:head>
 
 <div class="space-y-6" dir="rtl">
+	{#if helpTip}
+		<div
+			class="fixed z-[210] w-64 rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-2 text-[11px] leading-snug text-slate-200 shadow-xl"
+			style="top: {helpTip.top}px; left: {helpTip.left}px;"
+			role="tooltip"
+		>
+			<strong class="text-emerald-300">{helpTip.label}</strong>
+			{helpTip.text}
+			<br />כל משחק מקבל ציון לפי קושי היריב: ירוק {signed(EASE_SCORE.green)} · צהוב {signed(EASE_SCORE.yellow)} · אדום {signed(EASE_SCORE.red)}.
+			<br />הקושי נקבע לפי העמדה: לשוער/הגנה לפי ההתקפה של היריב, לקישור/התקפה לפי ההגנה שלו.
+			<br />התוצאה היא ממוצע 11 שחקני ההרכב (בלי הספסל). גבוה = קל.
+		</div>
+	{/if}
 	<header class="flex flex-wrap items-center justify-between gap-3">
 		<div>
 			<h1 class="text-2xl font-bold text-white">סקיצות</h1>
@@ -206,6 +244,54 @@
 			</button>
 		{/if}
 	</header>
+
+	{#snippet teamRuleRow(rule: 'required' | 'noIn', label: string, hint: string, selected: number[], onClass: string)}
+		<form method="POST" action="?/toggleTeamRule" use:enhance class="space-y-1.5">
+			<input type="hidden" name="gameweekNumber" value={data.gw} />
+			<input type="hidden" name="rule" value={rule} />
+			<p class="text-xs text-slate-300">{label} <span class="text-slate-500">· {hint}</span></p>
+			<div class="flex flex-wrap gap-1.5">
+				{#each data.teams as t (t.id)}
+					{@const on = selected.includes(t.id)}
+					<button
+						type="submit"
+						name="teamId"
+						value={t.id}
+						aria-pressed={on}
+						class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs {on
+							? onClass
+							: 'border-slate-700 text-slate-400 hover:bg-slate-800'}"
+					>
+						{#if t.logo}<img src={t.logo} alt="" class="h-4 w-4 object-contain" />{/if}
+						{t.name}
+					</button>
+				{/each}
+			</div>
+		</form>
+	{/snippet}
+
+	<section class="space-y-3 rounded-2xl border border-slate-700/80 bg-slate-900/70 p-3">
+		<h2 class="text-sm font-semibold text-slate-300">
+			אילוצי מחזור {data.gw}
+			{#if hasTeamRules && shown.length}
+				<span class="font-normal text-slate-500">· {meetingRules} מתוך {shown.length} סקיצות עומדות בהם</span>
+			{/if}
+		</h2>
+		{@render teamRuleRow(
+			'required',
+			'לפחות שחקן אחד מ:',
+			'בהרכב או בספסל',
+			data.teamRules.requiredTeamIds,
+			'border-emerald-500/60 bg-emerald-500/20 text-emerald-100'
+		)}
+		{@render teamRuleRow(
+			'noIn',
+			'לא להכניס שחקנים מ:',
+			data.transferBaseGw != null ? `מי שכבר בקבוצה של מחזור ${data.transferBaseGw} יכול להישאר` : 'מי שכבר בקבוצה השמורה יכול להישאר',
+			data.teamRules.noInTeamIds,
+			'border-red-500/60 bg-red-500/20 text-red-100'
+		)}
+	</section>
 
 	{#if data.sketches.length === 0}
 		<p class="rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-6 text-center text-slate-400">
@@ -310,6 +396,13 @@
 							<th class="px-1.5 py-1 text-center font-medium">
 								<button type="button" class="hover:text-slate-200" onclick={() => sortBy('valid')}>חוקי{mark('valid')}</button>
 							</th>
+							{#if hasTeamRules}
+								<th class="px-1.5 py-1 text-center font-medium">
+									<button type="button" class="hover:text-slate-200" title="אילוצי המחזור שהסקיצה מפרה" onclick={() => sortBy('rules')}
+										>אילוצים{mark('rules')}</button
+									>
+								</th>
+							{/if}
 							<th class="px-1.5 py-1 font-medium">
 								<button type="button" class="hover:text-slate-200" title="מספר היוצאים" onclick={() => sortBy('out')}
 									>יוצאים{mark('out')}</button
@@ -325,9 +418,23 @@
 									class="px-1.5 py-1 text-center font-medium"
 									aria-sort={sortKey === c.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
 								>
-									<button type="button" class="hover:text-slate-200" title={c.hint} onclick={() => sortBy(c.key)}
-										>{c.label}{mark(c.key)}</button
-									>
+									<span class="inline-flex items-center gap-1">
+										<button type="button" class="hover:text-slate-200" title={c.hint} onclick={() => sortBy(c.key)}
+											>{c.label}{mark(c.key)}</button
+										>
+										{#if c.help}
+											<button
+												type="button"
+												class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-200 hover:bg-slate-600"
+												aria-label="איך מחושב {c.label}"
+												onclick={(e) => toggleHelp(c, e.currentTarget)}
+												onmouseenter={(e) => showHelp(c, e.currentTarget)}
+												onmouseleave={() => {
+													if (helpTip?.key === c.key && !helpTip.pinned) helpTip = null;
+												}}>?</button
+											>
+										{/if}
+									</span>
 								</th>
 							{/each}
 							<th class="w-6 py-1"><span class="sr-only">מחיקה</span></th>
@@ -359,6 +466,12 @@
 								<td class="px-1.5 text-center {s.insights.valid ? 'text-emerald-300' : 'text-red-300'}"
 									title={s.insights.issues.join(' · ')}>{s.insights.valid ? '✓' : '✕'}</td
 								>
+								{#if hasTeamRules}
+									<td
+										class="px-1.5 text-center {s.teamRuleIssues.length ? 'text-red-300' : 'text-emerald-300'}"
+										title={s.teamRuleIssues.join(' · ')}>{s.teamRuleIssues.length ? `✕ ${s.teamRuleIssues.length}` : '✓'}</td
+									>
+								{/if}
 								<td class="max-w-[18rem] px-1.5 text-red-200">
 									{#if s.transfers.out.length}
 										{s.transfers.out.map((p) => p.name).join(', ')}
@@ -478,6 +591,11 @@
 								<li class="text-emerald-300">✓ הרכב חוקי (תקציב, עמדות, ספסל, עד 2 מקבוצה)</li>
 							{:else}
 								<li class="text-red-300">✕ לא חוקי: {i.issues.join(' · ')}</li>
+							{/if}
+							{#if s.teamRuleIssues.length}
+								<li class="text-red-300">✕ אילוצי מחזור: {s.teamRuleIssues.join(' · ')}</li>
+							{:else if hasTeamRules}
+								<li class="text-emerald-300">✓ עומד באילוצי המחזור</li>
 							{/if}
 							{#if i.overTransfers}
 								<li class="text-red-300">✕ {i.transfers} חילופים — יותר מ־{i.freeTransfers} החופשיים</li>

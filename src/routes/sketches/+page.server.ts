@@ -2,7 +2,7 @@ import { getPointsDeciles } from '$lib/server/pointsDeciles';
 import { fail, redirect } from '@sveltejs/kit';
 import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { downloadedLineups, mySquad, players, sketches, teams } from '$lib/server/db/schema';
+import { downloadedLineups, matchdayPlan, mySquad, players, sketches, teams } from '$lib/server/db/schema';
 import { lineupKey } from '$lib/squadDraft';
 import {
 	getUpcomingFixturesByTeamIds,
@@ -13,7 +13,7 @@ import { formatPrice } from '$lib/format';
 import { isExactSquad } from '$lib/squadDraft';
 import { lastRoundPoints, seasonPoints } from '$lib/stats';
 import { transferDiff } from '$lib/transfers';
-import { lineupInsights, loadInsightContext } from '$lib/server/lineupInsights';
+import { lineupInsights, loadInsightContext, teamRuleIssues } from '$lib/server/lineupInsights';
 import type { Actions, PageServerLoad } from './$types';
 import { getBaseSquad } from '$lib/server/strategyTracking';
 
@@ -106,8 +106,24 @@ export const load: PageServerLoad = async ({ url }) => {
 		).map((r) => r.key)
 	);
 
+	const teamList = await db
+		.select({ id: teams.id, name: teams.name, logo: teams.logoPath })
+		.from(teams)
+		.orderBy(teams.name);
+	const plan = (
+		await db
+			.select({ requiredTeamIds: matchdayPlan.requiredTeamIds, noInTeamIds: matchdayPlan.noInTeamIds })
+			.from(matchdayPlan)
+			.where(eq(matchdayPlan.gameweekNumber, gw))
+	)[0];
+	const teamRules = plan ?? { requiredTeamIds: [], noInTeamIds: [] };
+	const teamOf = new Map(playerRows.map((r) => [r.player.id, r.player.teamId]));
+	const teamName = new Map(teamList.map((t) => [t.id, t.name]));
+
 	return {
 		gw,
+		teams: teamList,
+		teamRules,
 		/** Matchday whose official team is the transfer baseline (null = the saved team). */
 		transferBaseGw: transferBase.ids.length ? transferBase.fromGw : null,
 		currentGw: current,
@@ -134,6 +150,8 @@ export const load: PageServerLoad = async ({ url }) => {
 				xiPlayers: cards(s.xiPlayerIds),
 				benchPlayers: cards(s.benchPlayerIds),
 				insights,
+				// No base squad at all → nothing counts as «coming in».
+				teamRuleIssues: teamRuleIssues(sketchIds, baseIds.length ? inn : [], teamRules, teamOf, teamName),
 				transfers: {
 					out,
 					in: inn
@@ -162,6 +180,30 @@ function duplicateInfo(s: SketchRow, group: SketchRow[]) {
 }
 
 export const actions: Actions = {
+	/** Turn one team on/off in one of the matchday's team rules. */
+	toggleTeamRule: async ({ request }) => {
+		const form = await request.formData();
+		const gw = Number(form.get('gameweekNumber'));
+		const teamId = Number(form.get('teamId'));
+		const rule = form.get('rule');
+		if (!Number.isInteger(gw) || gw < 1 || (rule !== 'required' && rule !== 'noIn')) {
+			return fail(400, { message: 'חסרים נתונים' });
+		}
+		const team = (await db.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)))[0];
+		if (!team) return fail(400, { message: 'קבוצה לא מוכרת' });
+		const plan = (await db.select().from(matchdayPlan).where(eq(matchdayPlan.gameweekNumber, gw)))[0];
+		const key = rule === 'required' ? 'requiredTeamIds' : 'noInTeamIds';
+		const current = plan?.[key] ?? [];
+		const next = current.includes(teamId) ? current.filter((id) => id !== teamId) : [...current, teamId];
+		await db
+			.insert(matchdayPlan)
+			.values({ gameweekNumber: gw, [key]: next })
+			.onConflictDoUpdate({
+				target: matchdayPlan.gameweekNumber,
+				set: { [key]: next, updatedAt: new Date() }
+			});
+		return { success: true };
+	},
 	/** Remember these lineups (by content, see `lineupKey`) as downloaded for the matchday. */
 	markDownloaded: async ({ request }) => {
 		const form = await request.formData();

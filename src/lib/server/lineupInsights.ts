@@ -135,6 +135,27 @@ function playerSd(points: number[], position: number): number {
 }
 
 
+export type TeamRules = { requiredTeamIds: number[]; noInTeamIds: number[] };
+
+/** Matchday team rules this lineup breaks. `incoming` = its transfers in vs the base squad. */
+export function teamRuleIssues(
+	squadIds: number[],
+	incoming: { id: number; name: string }[],
+	rules: TeamRules,
+	teamOf: Map<number, number>,
+	teamName: Map<number, string>
+): string[] {
+	const issues: string[] = [];
+	const squadTeams = new Set(squadIds.map((id) => teamOf.get(id)));
+	for (const team of rules.requiredTeamIds)
+		if (!squadTeams.has(team)) issues.push(`אין שחקן מ${teamName.get(team) ?? team}`);
+	for (const team of rules.noInTeamIds) {
+		const names = incoming.filter((p) => teamOf.get(p.id) === team).map((p) => p.name);
+		if (names.length) issues.push(`נכנסים מ${teamName.get(team) ?? team}: ${names.join(', ')}`);
+	}
+	return issues;
+}
+
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const avg = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
 
